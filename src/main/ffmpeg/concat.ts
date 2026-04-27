@@ -19,6 +19,10 @@ export interface ConcatResult {
   durationMs: number;
 }
 
+function logCleanupFailure(error: unknown): void {
+  console.warn('Failed to remove temporary concat list file.', error);
+}
+
 /** Build a UTF-8 concat list (no BOM) per the demuxer's format. Single-quote
  *  each path; escape any literal apostrophe as `'\''`. Backslashes inside a
  *  single-quoted concat-list path are NOT escape characters, so Windows
@@ -100,13 +104,13 @@ export async function runConcat(
 
     child.on('error', (err) => {
       signal.removeEventListener('abort', onAbort);
-      fs.unlink(listPath).catch(() => {});
+      void fs.unlink(listPath).catch(logCleanupFailure);
       reject(err);
     });
 
     child.on('close', (code, sigName) => {
       signal.removeEventListener('abort', onAbort);
-      fs.unlink(listPath).catch(() => {});
+      void fs.unlink(listPath).catch(logCleanupFailure);
 
       if (signal.aborted) {
         const e: Error & { cancelled?: boolean } = new Error('cancelled');

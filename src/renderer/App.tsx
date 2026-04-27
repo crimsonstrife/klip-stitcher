@@ -6,7 +6,7 @@ import { DropZone } from './components/DropZone';
 import { ClipList } from './components/ClipList';
 import { StitchPanel } from './components/StitchPanel';
 import type {
-  Clip,
+  ClipScanResult,
   JobDone,
   JobProgress,
 } from '../shared/ipc-contract';
@@ -14,16 +14,26 @@ import type {
 interface ActiveJob {
   id: string;
   progress: JobProgress | null;
+  totalBytes: number;
 }
 
 export function App() {
   const [folder, setFolder] = useState<string | null>(null);
-  const [clips, setClips] = useState<Clip[]>([]);
+  const [scanResult, setScanResult] = useState<ClipScanResult>({
+    clips: [],
+    sessions: [],
+  });
+  const [selectedClipPaths, setSelectedClipPaths] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [output, setOutput] = useState<string | null>(null);
   const [job, setJob] = useState<ActiveJob | null>(null);
   const [result, setResult] = useState<JobDone | null>(null);
+
+  const clips = scanResult.clips;
+  const sessions = scanResult.sessions;
 
   useEffect(() => {
     const unsubProgress = window.api.onProgress((p) => {
@@ -40,18 +50,24 @@ export function App() {
   }, []);
 
   const totalBytes = clips.reduce((sum, c) => sum + c.size, 0);
+  const selectedClips = clips.filter((clip) => selectedClipPaths.has(clip.path));
+  const selectedBytes = selectedClips.reduce((sum, clip) => sum + clip.size, 0);
 
   const handlePickFolder = async () => {
     const f = await window.api.pickFolder();
     if (!f) return;
     setFolder(f);
-    setClips([]);
+    setScanResult({ clips: [], sessions: [] });
+    setSelectedClipPaths(new Set());
     setScanError(null);
     setScanning(true);
     setResult(null);
     try {
-      const cs = await window.api.scanFolder(f);
-      setClips(cs);
+      const nextScanResult = await window.api.scanFolder(f);
+      setScanResult(nextScanResult);
+      setSelectedClipPaths(
+        new Set(nextScanResult.sessions[0]?.clipPaths ?? []),
+      );
     } catch (e) {
       setScanError(String(e));
     } finally {
@@ -60,20 +76,21 @@ export function App() {
   };
 
   const handlePickOutput = async () => {
-    const first = clips[0]?.name?.replace(/\.mkv$/i, '') ?? 'stitched';
+    const leadClip = selectedClips[0] ?? clips[0];
+    const first = leadClip?.name.replace(/\.[^.]+$/u, '') ?? 'stitched';
     const o = await window.api.pickOutputFile(`${first}-stitched.mkv`);
     if (o) setOutput(o);
   };
 
   const handleStitch = async () => {
-    if (!output || clips.length === 0) return;
+    if (!output || selectedClips.length === 0) return;
     setResult(null);
     const id = await window.api.startStitch({
-      inputs: clips.map((c) => c.path),
+      inputs: selectedClips.map((c) => c.path),
       output,
-      totalBytes,
+      totalBytes: selectedBytes,
     });
-    setJob({ id, progress: null });
+    setJob({ id, progress: null, totalBytes: selectedBytes });
   };
 
   const handleCancel = async () => {
@@ -82,6 +99,32 @@ export function App() {
 
   const handleOpenOutput = (filePath: string) => {
     window.api.openInExplorer(filePath);
+  };
+
+  const handleToggleClip = (clipPath: string, checked: boolean) => {
+    setSelectedClipPaths((current) => {
+      const next = new Set(current);
+      if (checked) {
+        next.add(clipPath);
+      } else {
+        next.delete(clipPath);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleSession = (clipPaths: string[], checked: boolean) => {
+    setSelectedClipPaths((current) => {
+      const next = new Set(current);
+      for (const clipPath of clipPaths) {
+        if (checked) {
+          next.add(clipPath);
+        } else {
+          next.delete(clipPath);
+        }
+      }
+      return next;
+    });
   };
 
   return (
@@ -110,11 +153,18 @@ export function App() {
 
       {clips.length > 0 && (
         <>
-          <ClipList clips={clips} />
+          <ClipList
+            clips={clips}
+            sessions={sessions}
+            selectedPaths={selectedClipPaths}
+            selectedBytes={selectedBytes}
+            onToggleClip={handleToggleClip}
+            onToggleSession={handleToggleSession}
+          />
           <StitchPanel
             output={output}
-            clipCount={clips.length}
-            totalBytes={totalBytes}
+            clipCount={selectedClips.length}
+            totalBytes={job?.totalBytes ?? selectedBytes}
             running={!!job}
             progress={job?.progress ?? null}
             result={result}

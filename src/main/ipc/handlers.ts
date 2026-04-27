@@ -7,7 +7,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { CH } from '../../shared/ipc-channels';
 import type {
-  Clip,
+  ClipScanResult,
   FfmpegPaths,
   JobDone,
   JobProgress,
@@ -61,7 +61,7 @@ export function registerIpcHandlers(
   // --- M1 scan ------------------------------------------------------
   ipcMain.handle(
     CH.CLIPS_SCAN,
-    async (_event, folder: string): Promise<Clip[]> => {
+    async (_event, folder: string): Promise<ClipScanResult> => {
       return await scanFolder(folder);
     },
   );

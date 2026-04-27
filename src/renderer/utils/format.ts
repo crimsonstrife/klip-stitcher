@@ -19,3 +19,13 @@ export function formatDuration(ms: number): string {
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
 }
+
+function pad2(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+export function formatDateTime(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return 'unknown';
+  const date = new Date(ms);
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+}
