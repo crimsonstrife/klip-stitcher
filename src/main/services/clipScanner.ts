@@ -57,6 +57,9 @@ export async function scanFolder(folder: string): Promise<ClipScanResult> {
         metadata: null,
         probeStatus: 'idle',
         probeError: null,
+        thumbnailUrl: null,
+        thumbnailStatus: 'idle',
+        thumbnailError: null,
       };
     }),
   );

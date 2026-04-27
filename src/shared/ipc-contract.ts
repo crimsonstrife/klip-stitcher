@@ -27,6 +27,11 @@ export interface ClipMetadata {
 }
 
 export type ClipProbeStatus = 'idle' | 'probing' | 'ready' | 'error';
+export type ClipThumbnailStatus =
+  | 'idle'
+  | 'generating'
+  | 'ready'
+  | 'error';
 
 export interface Clip {
   /** Absolute path to the .mkv file. */
@@ -48,6 +53,12 @@ export interface Clip {
   probeStatus: ClipProbeStatus;
   /** ffprobe error string when probeStatus === 'error'. */
   probeError: string | null;
+  /** Cached preview-frame image URL when available. */
+  thumbnailUrl: string | null;
+  /** Background thumbnail generation state. */
+  thumbnailStatus: ClipThumbnailStatus;
+  /** Thumbnail-generation error string when thumbnailStatus === 'error'. */
+  thumbnailError: string | null;
 }
 
 export interface ClipSession {
@@ -71,6 +82,17 @@ export interface ClipScanResult {
 export interface ClipProbeResult {
   path: string;
   metadata: ClipMetadata | null;
+  error: string | null;
+}
+
+export interface ClipThumbnailRequest {
+  path: string;
+  mtime: number;
+}
+
+export interface ClipThumbnailResult {
+  path: string;
+  thumbnailUrl: string | null;
   error: string | null;
 }
 
@@ -114,6 +136,9 @@ export interface Api {
   pickOutputFile(defaultName: string): Promise<string | null>;
   scanFolder(folder: string): Promise<ClipScanResult>;
   probeClips(paths: string[]): Promise<ClipProbeResult[]>;
+  generateThumbnails(
+    requests: ClipThumbnailRequest[],
+  ): Promise<ClipThumbnailResult[]>;
   startStitch(opts: StitchOptions): Promise<string>;
   cancelStitch(jobId: string): Promise<void>;
   openInExplorer(filePath: string): Promise<void>;

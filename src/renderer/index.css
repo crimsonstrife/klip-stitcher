@@ -142,7 +142,7 @@ body {
   background: color-mix(
     in srgb,
     var(--wa-color-brand-fill-loud, #4a8cff) 8%,
-    transparent
+    var(--wa-color-surface-default, canvas)
   );
   border-bottom: 1px solid var(--wa-color-neutral-border-quiet, #eee);
   position: sticky;
@@ -190,6 +190,50 @@ body {
 .ks-cliprow-check {
   display: inline-flex;
   align-items: center;
+}
+
+.ks-cliprow-thumb {
+  width: 72px;
+  height: 40px;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(127, 127, 127, 0.12);
+  border: 1px solid var(--wa-color-neutral-border-quiet, #eee);
+}
+
+.ks-cliprow-thumb-generating {
+  background:
+    linear-gradient(
+      110deg,
+      rgba(127, 127, 127, 0.08) 8%,
+      rgba(127, 127, 127, 0.2) 18%,
+      rgba(127, 127, 127, 0.08) 33%
+    ),
+    rgba(127, 127, 127, 0.12);
+  background-size: 200% 100%;
+  animation: ks-thumb-shimmer 1.2s linear infinite;
+}
+
+.ks-cliprow-thumb-ready {
+  background: rgba(127, 127, 127, 0.08);
+}
+
+.ks-cliprow-thumb-error {
+  border-color: color-mix(
+    in srgb,
+    var(--wa-color-danger-fill-loud, #cb2f47) 45%,
+    var(--wa-color-neutral-border-quiet, #eee)
+  );
+}
+
+.ks-cliprow-thumb-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .ks-cliprow-name {
@@ -257,6 +301,7 @@ body {
 }
 
 .ks-cliprow-excluded .ks-cliprow-icon,
+.ks-cliprow-excluded .ks-cliprow-thumb,
 .ks-cliprow-excluded .ks-cliprow-metadata,
 .ks-cliprow-excluded .ks-cliprow-name,
 .ks-cliprow-excluded .ks-cliprow-size {
@@ -333,6 +378,12 @@ code {
   padding: 0.125rem 0.375rem;
   border-radius: 0.25rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@keyframes ks-thumb-shimmer {
+  to {
+    background-position-x: -200%;
+  }
 }
 
 @media (max-width: 720px) {

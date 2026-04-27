@@ -20,6 +20,7 @@ interface Props {
   selectedBytes: number;
   selectedDurationMs: number | null;
   probingMetadata: boolean;
+  generatingThumbnails: boolean;
   onToggleClip: (clipPath: string, checked: boolean) => void;
   onToggleSession: (clipPaths: string[], checked: boolean) => void;
 }
@@ -31,6 +32,7 @@ export function ClipList({
   selectedBytes,
   selectedDurationMs,
   probingMetadata,
+  generatingThumbnails,
   onToggleClip,
   onToggleSession,
 }: Props) {
@@ -60,6 +62,9 @@ export function ClipList({
           )}
           {probingMetadata && (
             <span className="ks-probing-note">Probing clip metadata…</span>
+          )}
+          {generatingThumbnails && (
+            <span className="ks-probing-note">Generating thumbnails…</span>
           )}
           {!probingMetadata && probeErrors > 0 && (
             <span className="ks-unparsed-warning">
@@ -132,10 +137,23 @@ export function ClipList({
                         }}
                       />
                     </span>
-                    <FontAwesomeIcon
-                      icon={faFilm}
-                      className="ks-cliprow-icon"
-                    />
+                    <span
+                      className={`ks-cliprow-thumb ks-cliprow-thumb-${clip.thumbnailStatus}`}
+                      title={clip.thumbnailError ?? undefined}
+                    >
+                      {clip.thumbnailUrl ? (
+                        <img
+                          src={clip.thumbnailUrl}
+                          alt=""
+                          className="ks-cliprow-thumb-image"
+                        />
+                      ) : (
+                        <FontAwesomeIcon
+                          icon={faFilm}
+                          className="ks-cliprow-icon"
+                        />
+                      )}
+                    </span>
                     <span className="ks-cliprow-name" title={clip.path}>
                       {clip.name}
                     </span>

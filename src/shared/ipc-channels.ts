@@ -9,6 +9,7 @@ export const CH = {
   // M1 — clips
   CLIPS_SCAN: 'clips:scan',
   CLIPS_PROBE: 'clips:probe',
+  CLIPS_THUMBNAIL: 'clips:thumbnail',
 
   // M1 — jobs
   JOB_START: 'job:start',

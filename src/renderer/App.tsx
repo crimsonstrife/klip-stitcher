@@ -9,6 +9,7 @@ import type {
   Clip,
   ClipProbeResult,
   ClipScanResult,
+  ClipThumbnailResult,
   JobDone,
   JobProgress,
 } from '../shared/ipc-contract';
@@ -27,6 +28,9 @@ function markClipsAsProbing(scanResult: ClipScanResult): ClipScanResult {
       metadata: null,
       probeStatus: 'probing',
       probeError: null,
+      thumbnailUrl: null,
+      thumbnailStatus: 'generating',
+      thumbnailError: null,
     })),
   };
 }
@@ -52,6 +56,47 @@ function applyProbeResults(
         probeError: result.error,
       };
     }),
+  };
+}
+
+function applyThumbnailResults(
+  scanResult: ClipScanResult,
+  thumbnailResults: ClipThumbnailResult[],
+): ClipScanResult {
+  const thumbnailsByPath = new Map(
+    thumbnailResults.map((result) => [result.path, result]),
+  );
+
+  return {
+    ...scanResult,
+    clips: scanResult.clips.map((clip) => {
+      const result = thumbnailsByPath.get(clip.path);
+      if (!result) {
+        return clip;
+      }
+
+      return {
+        ...clip,
+        thumbnailUrl: result.thumbnailUrl,
+        thumbnailStatus: result.error ? 'error' : 'ready',
+        thumbnailError: result.error,
+      };
+    }),
+  };
+}
+
+function markThumbnailFailure(
+  scanResult: ClipScanResult,
+  errorMessage: string,
+): ClipScanResult {
+  return {
+    ...scanResult,
+    clips: scanResult.clips.map((clip) => ({
+      ...clip,
+      thumbnailUrl: null,
+      thumbnailStatus: 'error',
+      thumbnailError: errorMessage,
+    })),
   };
 }
 
@@ -125,6 +170,11 @@ export function App() {
   const probingMetadata = clips.some(
     (clip) => clip.probeStatus === 'idle' || clip.probeStatus === 'probing',
   );
+  const generatingThumbnails = clips.some(
+    (clip) =>
+      clip.thumbnailStatus === 'idle' ||
+      clip.thumbnailStatus === 'generating',
+  );
   const metadataErrorCount = clips.filter(
     (clip) => clip.probeStatus === 'error',
   ).length;
@@ -169,6 +219,30 @@ export function App() {
             }
             setScanResult((current) =>
               markProbeFailure(current, String(error)),
+            );
+          });
+
+        void window.api
+          .generateThumbnails(
+            nextScanResult.clips.map((clip) => ({
+              path: clip.path,
+              mtime: clip.mtime,
+            })),
+          )
+          .then((thumbnailResults) => {
+            if (scanTokenRef.current !== scanToken) {
+              return;
+            }
+            setScanResult((current) =>
+              applyThumbnailResults(current, thumbnailResults),
+            );
+          })
+          .catch((error) => {
+            if (scanTokenRef.current !== scanToken) {
+              return;
+            }
+            setScanResult((current) =>
+              markThumbnailFailure(current, String(error)),
             );
           });
       }
@@ -271,6 +345,7 @@ export function App() {
             selectedBytes={selectedBytes}
             selectedDurationMs={selectedDurationMs}
             probingMetadata={probingMetadata}
+            generatingThumbnails={generatingThumbnails}
             onToggleClip={handleToggleClip}
             onToggleSession={handleToggleSession}
           />

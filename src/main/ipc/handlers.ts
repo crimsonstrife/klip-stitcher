@@ -9,6 +9,8 @@ import { CH } from '../../shared/ipc-channels';
 import type {
   ClipProbeResult,
   ClipScanResult,
+  ClipThumbnailRequest,
+  ClipThumbnailResult,
   FfmpegPaths,
   JobDone,
   JobProgress,
@@ -16,6 +18,7 @@ import type {
 } from '../../shared/ipc-contract';
 import { resolveFfmpegPath, resolveFfprobePath } from '../ffmpeg/binaries';
 import { probeClips } from '../ffmpeg/probe';
+import { generateThumbnails } from '../ffmpeg/thumbnail';
 import { scanFolder } from '../services/clipScanner';
 import { runConcat } from '../ffmpeg/concat';
 
@@ -72,6 +75,16 @@ export function registerIpcHandlers(
     CH.CLIPS_PROBE,
     async (_event, paths: string[]): Promise<ClipProbeResult[]> => {
       return await probeClips(paths);
+    },
+  );
+
+  ipcMain.handle(
+    CH.CLIPS_THUMBNAIL,
+    async (
+      _event,
+      requests: ClipThumbnailRequest[],
+    ): Promise<ClipThumbnailResult[]> => {
+      return await generateThumbnails(requests);
     },
   );
 
