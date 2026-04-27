@@ -58,6 +58,20 @@ const config: ForgeConfig = {
       [FuseV1Options.OnlyLoadAppFromAsar]: true,
     }),
   ],
+  publishers: [
+    {
+      name: '@electron-forge/publisher-github',
+      config: {
+        repository: {
+          owner: 'crimsonstrife',
+          name: 'klip-stitcher',
+        },
+        prerelease: false,
+        draft: false,
+        generateReleaseNotes: true,
+      },
+    },
+  ],
 };
 
 export default config;

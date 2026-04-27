@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
+import { initializeAutoUpdates } from './autoUpdate';
 import { registerIpcHandlers } from './ipc/handlers';
 
 // Surface fatal errors to stderr and exit with a non-zero code instead of
@@ -66,6 +67,7 @@ const createWindow = () => {
 app.whenReady().then(() => {
   registerIpcHandlers(ipcMain, () => mainWindow);
   createWindow();
+  initializeAutoUpdates();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
