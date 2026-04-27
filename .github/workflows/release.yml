@@ -32,6 +32,9 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Audit shipped dependencies
+        run: npm run audit:runtime
+
       - name: Build distributables
         run: npm run make
 

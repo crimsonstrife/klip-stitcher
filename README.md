@@ -23,6 +23,7 @@ Useful checks:
 ```bash
 npm run lint
 npx tsc --noEmit
+npm run audit:runtime
 ```
 
 ## Packaging
@@ -68,6 +69,10 @@ Automated publish:
 ## Auto-update
 
 Packaged Windows and macOS builds call `update-electron-app` from the main process and check GitHub Releases for updates every hour. Draft and pre-release GitHub releases are ignored by the public update service, so stable auto-updates require normal published releases with semver tags.
+
+## Dependency security
+
+`npm audit --omit=dev` is the most important audit signal for this app, because it reflects the dependencies that ship with the packaged desktop build. The full `npm audit` output also includes build-time tooling such as Electron Forge, Vite, and linting dependencies, which can stay noisy even when the shipped app dependency set is clean.
 
 ## Unsigned Windows builds
 

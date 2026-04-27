@@ -18,7 +18,10 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "lint": "eslint --ext .ts,.tsx ."
+    "lint": "eslint --ext .ts,.tsx .",
+    "audit": "npm audit",
+    "audit:runtime": "npm audit --omit=dev",
+    "deps:outdated": "npm outdated"
   },
   "keywords": [],
   "author": {

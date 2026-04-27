@@ -43,13 +43,16 @@ It:
 1. Runs on pushes to tags matching `v*`
 2. Installs dependencies
 3. Runs lint and TypeScript checks
-4. Runs `npm run make`
-5. Creates the GitHub Release if it does not already exist
-6. Uploads the built artifacts with `gh release upload --clobber`
+4. Runs `npm run audit:runtime`
+5. Runs `npm run make`
+6. Creates the GitHub Release if it does not already exist
+7. Uploads the built artifacts with `gh release upload --clobber`
 
 The workflow uses the repo-scoped `GITHUB_TOKEN` automatically, with `contents: write` permission.
 
 This makes reruns safer than Forge's publisher alone, because an existing release tag can be reused instead of failing with `already_exists`.
+
+The runtime audit gate focuses on shipped dependencies only. Full `npm audit` output is still useful for maintenance work, but it includes dev-only tooling dependencies that do not ship inside the packaged app.
 
 ## Recommended release flow
 
