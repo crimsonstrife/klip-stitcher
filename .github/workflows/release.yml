@@ -32,7 +32,26 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
-      - name: Publish GitHub Release artifacts
-        run: npm run publish
+      - name: Build distributables
+        run: npm run make
+
+      - name: Ensure GitHub Release exists
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --generate-notes
+          }
+
+      - name: Upload release artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $artifactPaths = Get-ChildItem out/make -Recurse -File | ForEach-Object FullName
+          if ($artifactPaths.Count -eq 0) {
+            throw "No release artifacts were found under out/make."
+          }
+          gh release upload $tag $artifactPaths --clobber

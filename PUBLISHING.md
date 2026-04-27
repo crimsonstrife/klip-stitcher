@@ -43,9 +43,13 @@ It:
 1. Runs on pushes to tags matching `v*`
 2. Installs dependencies
 3. Runs lint and TypeScript checks
-4. Runs `npm run publish`
+4. Runs `npm run make`
+5. Creates the GitHub Release if it does not already exist
+6. Uploads the built artifacts with `gh release upload --clobber`
 
 The workflow uses the repo-scoped `GITHUB_TOKEN` automatically, with `contents: write` permission.
+
+This makes reruns safer than Forge's publisher alone, because an existing release tag can be reused instead of failing with `already_exists`.
 
 ## Recommended release flow
 
@@ -110,3 +114,8 @@ If auto-update does not see a release:
 - Make sure the GitHub Release is not a draft
 - Make sure it is not marked as a prerelease
 - Make sure the tag is valid semver with the default `v` prefix
+
+If the GitHub Actions workflow is rerun for the same tag:
+
+- The workflow will reuse the existing release
+- Existing assets with the same names are overwritten with `--clobber`

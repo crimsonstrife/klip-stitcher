@@ -62,8 +62,8 @@ npm run publish
 Automated publish:
 
 - Pushing a tag that matches `v*` triggers `.github/workflows/release.yml`.
-- The workflow installs dependencies, runs lint and TypeScript checks, then uploads the Windows release artifacts to GitHub Releases.
-- Release notes are generated automatically by the GitHub publisher configuration.
+- The workflow installs dependencies, runs lint and TypeScript checks, builds the Windows artifacts, creates the GitHub Release if needed, and uploads assets in a rerun-safe way.
+- Local `npm run publish` is still available when you want Forge to publish directly with a user token.
 
 ## Auto-update
 
