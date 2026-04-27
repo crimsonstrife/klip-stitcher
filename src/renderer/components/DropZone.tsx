@@ -3,13 +3,16 @@ import { faFolderOpen } from '@fortawesome/free-solid-svg-icons';
 import WaButton from '@awesome.me/webawesome/dist/react/button/index.js';
 import WaCard from '@awesome.me/webawesome/dist/react/card/index.js';
 import WaSpinner from '@awesome.me/webawesome/dist/react/spinner/index.js';
-import { formatBytes } from '../utils/format';
+import { formatBytes, formatDuration } from '../utils/format';
 
 interface Props {
   folder: string | null;
   clipCount: number;
   totalBytes: number;
+  totalDurationMs: number | null;
   scanning: boolean;
+  probingMetadata: boolean;
+  metadataErrorCount: number;
   onPickFolder: () => void;
 }
 
@@ -17,7 +20,10 @@ export function DropZone({
   folder,
   clipCount,
   totalBytes,
+  totalDurationMs,
   scanning,
+  probingMetadata,
+  metadataErrorCount,
   onPickFolder,
 }: Props) {
   return (
@@ -40,6 +46,27 @@ export function DropZone({
                 {clipCount.toLocaleString()} clip{clipCount === 1 ? '' : 's'}
                 {' · '}
                 {formatBytes(totalBytes)}
+                {totalDurationMs != null && (
+                  <>
+                    {' · '}
+                    {formatDuration(totalDurationMs)}
+                  </>
+                )}
+                {totalDurationMs == null && probingMetadata && (
+                  <>
+                    {' · '}
+                    probing metadata…
+                  </>
+                )}
+                {totalDurationMs == null &&
+                  !probingMetadata &&
+                  metadataErrorCount > 0 && (
+                    <>
+                      {' · '}
+                      duration unavailable for {metadataErrorCount} clip
+                      {metadataErrorCount === 1 ? '' : 's'}
+                    </>
+                  )}
               </span>
             )}
           </div>

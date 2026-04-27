@@ -119,6 +119,11 @@ body {
   gap: 0.4rem;
 }
 
+.ks-probing-note {
+  font-size: 0.85rem;
+  color: var(--wa-color-text-quiet, #777);
+}
+
 .ks-cliplist {
   list-style: none;
   margin: 0;
@@ -159,7 +164,7 @@ body {
 
 .ks-cliprow {
   display: grid;
-  grid-template-columns: auto auto auto 1fr auto;
+  grid-template-columns: auto auto auto minmax(0, 1fr) auto auto;
   gap: 0.75rem;
   align-items: center;
   padding: 0.4rem 0.5rem;
@@ -194,6 +199,14 @@ body {
   text-overflow: ellipsis;
 }
 
+.ks-cliprow-metadata {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
 .ks-cliprow-size {
   color: var(--wa-color-text-quiet, #777);
   font-variant-numeric: tabular-nums;
@@ -201,7 +214,50 @@ body {
   white-space: nowrap;
 }
 
+.ks-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.73rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  background: rgba(127, 127, 127, 0.12);
+  color: var(--wa-color-text-normal, inherit);
+}
+
+.ks-chip-duration {
+  background: color-mix(
+    in srgb,
+    var(--wa-color-brand-fill-loud, #4a8cff) 14%,
+    transparent
+  );
+}
+
+.ks-chip-codec {
+  background: color-mix(
+    in srgb,
+    var(--wa-color-success-fill-loud, #1d8f5a) 14%,
+    transparent
+  );
+}
+
+.ks-chip-pending {
+  color: var(--wa-color-text-quiet, #777);
+}
+
+.ks-chip-error {
+  background: color-mix(
+    in srgb,
+    var(--wa-color-danger-fill-loud, #cb2f47) 16%,
+    transparent
+  );
+  color: var(--wa-color-danger-text-loud, #a61f39);
+}
+
 .ks-cliprow-excluded .ks-cliprow-icon,
+.ks-cliprow-excluded .ks-cliprow-metadata,
 .ks-cliprow-excluded .ks-cliprow-name,
 .ks-cliprow-excluded .ks-cliprow-size {
   opacity: 0.45;
@@ -283,5 +339,16 @@ code {
   .ks-session-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .ks-cliprow {
+    grid-template-columns: auto auto auto minmax(0, 1fr);
+  }
+
+  .ks-cliprow-metadata,
+  .ks-cliprow-size {
+    grid-column: 4;
+    justify-content: flex-start;
+    margin-left: 0;
   }
 }

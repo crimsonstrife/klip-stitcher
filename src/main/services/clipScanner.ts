@@ -54,6 +54,9 @@ export async function scanFolder(folder: string): Promise<ClipScanResult> {
         size: stat.size,
         mtime: stat.mtimeMs,
         sessionId: '',
+        metadata: null,
+        probeStatus: 'idle',
+        probeError: null,
       };
     }),
   );

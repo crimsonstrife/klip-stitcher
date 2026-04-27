@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import WaCallout from '@awesome.me/webawesome/dist/react/callout/index.js';
@@ -6,6 +6,8 @@ import { DropZone } from './components/DropZone';
 import { ClipList } from './components/ClipList';
 import { StitchPanel } from './components/StitchPanel';
 import type {
+  Clip,
+  ClipProbeResult,
   ClipScanResult,
   JobDone,
   JobProgress,
@@ -15,6 +17,71 @@ interface ActiveJob {
   id: string;
   progress: JobProgress | null;
   totalBytes: number;
+}
+
+function markClipsAsProbing(scanResult: ClipScanResult): ClipScanResult {
+  return {
+    ...scanResult,
+    clips: scanResult.clips.map((clip) => ({
+      ...clip,
+      metadata: null,
+      probeStatus: 'probing',
+      probeError: null,
+    })),
+  };
+}
+
+function applyProbeResults(
+  scanResult: ClipScanResult,
+  probeResults: ClipProbeResult[],
+): ClipScanResult {
+  const probeByPath = new Map(probeResults.map((result) => [result.path, result]));
+
+  return {
+    ...scanResult,
+    clips: scanResult.clips.map((clip) => {
+      const result = probeByPath.get(clip.path);
+      if (!result) {
+        return clip;
+      }
+
+      return {
+        ...clip,
+        metadata: result.metadata,
+        probeStatus: result.error ? 'error' : 'ready',
+        probeError: result.error,
+      };
+    }),
+  };
+}
+
+function markProbeFailure(
+  scanResult: ClipScanResult,
+  errorMessage: string,
+): ClipScanResult {
+  return {
+    ...scanResult,
+    clips: scanResult.clips.map((clip) => ({
+      ...clip,
+      metadata: null,
+      probeStatus: 'error',
+      probeError: errorMessage,
+    })),
+  };
+}
+
+function sumDurationsOrNull(clips: Clip[]): number | null {
+  if (
+    clips.length === 0 ||
+    clips.some((clip) => clip.metadata?.durationMs == null)
+  ) {
+    return null;
+  }
+
+  return clips.reduce(
+    (sum, clip) => sum + (clip.metadata?.durationMs ?? 0),
+    0,
+  );
 }
 
 export function App() {
@@ -31,6 +98,7 @@ export function App() {
   const [output, setOutput] = useState<string | null>(null);
   const [job, setJob] = useState<ActiveJob | null>(null);
   const [result, setResult] = useState<JobDone | null>(null);
+  const scanTokenRef = useRef(0);
 
   const clips = scanResult.clips;
   const sessions = scanResult.sessions;
@@ -52,10 +120,21 @@ export function App() {
   const totalBytes = clips.reduce((sum, c) => sum + c.size, 0);
   const selectedClips = clips.filter((clip) => selectedClipPaths.has(clip.path));
   const selectedBytes = selectedClips.reduce((sum, clip) => sum + clip.size, 0);
+  const totalDurationMs = sumDurationsOrNull(clips);
+  const selectedDurationMs = sumDurationsOrNull(selectedClips);
+  const probingMetadata = clips.some(
+    (clip) => clip.probeStatus === 'idle' || clip.probeStatus === 'probing',
+  );
+  const metadataErrorCount = clips.filter(
+    (clip) => clip.probeStatus === 'error',
+  ).length;
 
   const handlePickFolder = async () => {
     const f = await window.api.pickFolder();
     if (!f) return;
+    const scanToken = scanTokenRef.current + 1;
+    scanTokenRef.current = scanToken;
+
     setFolder(f);
     setScanResult({ clips: [], sessions: [] });
     setSelectedClipPaths(new Set());
@@ -64,14 +143,43 @@ export function App() {
     setResult(null);
     try {
       const nextScanResult = await window.api.scanFolder(f);
-      setScanResult(nextScanResult);
+      if (scanTokenRef.current !== scanToken) {
+        return;
+      }
+
+      setScanResult(markClipsAsProbing(nextScanResult));
       setSelectedClipPaths(
         new Set(nextScanResult.sessions[0]?.clipPaths ?? []),
       );
+
+      if (nextScanResult.clips.length > 0) {
+        void window.api
+          .probeClips(nextScanResult.clips.map((clip) => clip.path))
+          .then((probeResults) => {
+            if (scanTokenRef.current !== scanToken) {
+              return;
+            }
+            setScanResult((current) =>
+              applyProbeResults(current, probeResults),
+            );
+          })
+          .catch((error) => {
+            if (scanTokenRef.current !== scanToken) {
+              return;
+            }
+            setScanResult((current) =>
+              markProbeFailure(current, String(error)),
+            );
+          });
+      }
     } catch (e) {
-      setScanError(String(e));
+      if (scanTokenRef.current === scanToken) {
+        setScanError(String(e));
+      }
     } finally {
-      setScanning(false);
+      if (scanTokenRef.current === scanToken) {
+        setScanning(false);
+      }
     }
   };
 
@@ -140,7 +248,10 @@ export function App() {
         folder={folder}
         clipCount={clips.length}
         totalBytes={totalBytes}
+        totalDurationMs={totalDurationMs}
         scanning={scanning}
+        probingMetadata={probingMetadata}
+        metadataErrorCount={metadataErrorCount}
         onPickFolder={handlePickFolder}
       />
 
@@ -158,6 +269,8 @@ export function App() {
             sessions={sessions}
             selectedPaths={selectedClipPaths}
             selectedBytes={selectedBytes}
+            selectedDurationMs={selectedDurationMs}
+            probingMetadata={probingMetadata}
             onToggleClip={handleToggleClip}
             onToggleSession={handleToggleSession}
           />

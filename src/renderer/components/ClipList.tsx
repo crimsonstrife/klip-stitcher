@@ -5,13 +5,21 @@ import WaButton from '@awesome.me/webawesome/dist/react/button/index.js';
 import WaCard from '@awesome.me/webawesome/dist/react/card/index.js';
 import WaCheckbox from '@awesome.me/webawesome/dist/react/checkbox/index.js';
 import type { Clip, ClipSession } from '../../shared/ipc-contract';
-import { formatBytes, formatDateTime } from '../utils/format';
+import {
+  formatBytes,
+  formatClipDuration,
+  formatCodecName,
+  formatDateTime,
+  formatDuration,
+} from '../utils/format';
 
 interface Props {
   clips: Clip[];
   sessions: ClipSession[];
   selectedPaths: ReadonlySet<string>;
   selectedBytes: number;
+  selectedDurationMs: number | null;
+  probingMetadata: boolean;
   onToggleClip: (clipPath: string, checked: boolean) => void;
   onToggleSession: (clipPaths: string[], checked: boolean) => void;
 }
@@ -21,11 +29,18 @@ export function ClipList({
   sessions,
   selectedPaths,
   selectedBytes,
+  selectedDurationMs,
+  probingMetadata,
   onToggleClip,
   onToggleSession,
 }: Props) {
   const unparsed = clips.filter((c) => c.timestamp == null).length;
-  const selectedCount = clips.filter((clip) => selectedPaths.has(clip.path)).length;
+  const probeErrors = clips.filter((clip) => clip.probeStatus === 'error').length;
+  const selectedClips = clips.filter((clip) => selectedPaths.has(clip.path));
+  const selectedCount = selectedClips.length;
+  const selectedProbeErrors = selectedClips.filter(
+    (clip) => clip.probeStatus === 'error',
+  ).length;
   const clipByPath = new Map(clips.map((clip) => [clip.path, clip]));
   const clipIndexByPath = new Map(
     clips.map((clip, index) => [clip.path, index]),
@@ -41,6 +56,15 @@ export function ClipList({
               <FontAwesomeIcon icon={faTriangleExclamation} /> {unparsed}{' '}
               clip{unparsed === 1 ? '' : 's'} sorted by mtime (filename did
               not match the OBS timestamp pattern)
+            </span>
+          )}
+          {probingMetadata && (
+            <span className="ks-probing-note">Probing clip metadata…</span>
+          )}
+          {!probingMetadata && probeErrors > 0 && (
+            <span className="ks-unparsed-warning">
+              <FontAwesomeIcon icon={faTriangleExclamation} /> metadata
+              unavailable for {probeErrors} clip{probeErrors === 1 ? '' : 's'}
             </span>
           )}
         </div>
@@ -115,6 +139,36 @@ export function ClipList({
                     <span className="ks-cliprow-name" title={clip.path}>
                       {clip.name}
                     </span>
+                    <div className="ks-cliprow-metadata">
+                      {clip.metadata?.durationMs != null && (
+                        <span className="ks-chip ks-chip-duration">
+                          {formatClipDuration(clip.metadata.durationMs)}
+                        </span>
+                      )}
+                      {clip.metadata?.videoCodec && (
+                        <span className="ks-chip ks-chip-codec">
+                          {formatCodecName(clip.metadata.videoCodec)}
+                        </span>
+                      )}
+                      {clip.metadata?.audioCodec && (
+                        <span className="ks-chip ks-chip-codec">
+                          {formatCodecName(clip.metadata.audioCodec)}
+                        </span>
+                      )}
+                      {clip.probeStatus === 'probing' && (
+                        <span className="ks-chip ks-chip-pending">
+                          Analyzing…
+                        </span>
+                      )}
+                      {clip.probeStatus === 'error' && (
+                        <span
+                          className="ks-chip ks-chip-error"
+                          title={clip.probeError ?? undefined}
+                        >
+                          Probe failed
+                        </span>
+                      )}
+                    </div>
                     <span className="ks-cliprow-size">
                       {formatBytes(clip.size)}
                     </span>
@@ -130,6 +184,28 @@ export function ClipList({
         {clips.length.toLocaleString()} clip{clips.length === 1 ? '' : 's'}
         {' · '}
         {formatBytes(selectedBytes)}
+        {selectedDurationMs != null && (
+          <>
+            {' · '}
+            {formatDuration(selectedDurationMs)}
+          </>
+        )}
+        {selectedDurationMs == null && selectedCount > 0 && probingMetadata && (
+          <>
+            {' · '}
+            probing duration…
+          </>
+        )}
+        {selectedDurationMs == null &&
+          selectedCount > 0 &&
+          !probingMetadata &&
+          selectedProbeErrors > 0 && (
+            <>
+              {' · '}
+              duration unavailable for {selectedProbeErrors} selected clip
+              {selectedProbeErrors === 1 ? '' : 's'}
+            </>
+          )}
       </div>
     </WaCard>
   );

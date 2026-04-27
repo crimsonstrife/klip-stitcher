@@ -3,6 +3,31 @@ export interface FfmpegPaths {
   ffprobe: string;
 }
 
+export interface ClipMetadata {
+  /** Container duration in milliseconds, if ffprobe reports one. */
+  durationMs: number | null;
+  /** Video codec name, e.g. "h264". */
+  videoCodec: string | null;
+  /** Audio codec name, e.g. "aac". */
+  audioCodec: string | null;
+  /** Encoded frame width. */
+  width: number | null;
+  /** Encoded frame height. */
+  height: number | null;
+  /** Pixel format, e.g. "yuv420p". */
+  pixelFormat: string | null;
+  /** Raw ffprobe frame-rate fraction, e.g. "60000/1001". */
+  frameRate: string | null;
+  /** Audio sample rate in Hz. */
+  sampleRate: number | null;
+  /** Audio channel count. */
+  channels: number | null;
+  /** Audio channel layout, e.g. "stereo". */
+  channelLayout: string | null;
+}
+
+export type ClipProbeStatus = 'idle' | 'probing' | 'ready' | 'error';
+
 export interface Clip {
   /** Absolute path to the .mkv file. */
   path: string;
@@ -17,6 +42,12 @@ export interface Clip {
   mtime: number;
   /** Scan-time session bucket, e.g. "session-1". */
   sessionId: string;
+  /** ffprobe-derived media metadata, populated after scanning. */
+  metadata: ClipMetadata | null;
+  /** Background metadata probe state. */
+  probeStatus: ClipProbeStatus;
+  /** ffprobe error string when probeStatus === 'error'. */
+  probeError: string | null;
 }
 
 export interface ClipSession {
@@ -35,6 +66,12 @@ export interface ClipSession {
 export interface ClipScanResult {
   clips: Clip[];
   sessions: ClipSession[];
+}
+
+export interface ClipProbeResult {
+  path: string;
+  metadata: ClipMetadata | null;
+  error: string | null;
 }
 
 export interface StitchOptions {
@@ -76,6 +113,7 @@ export interface Api {
   pickFolder(): Promise<string | null>;
   pickOutputFile(defaultName: string): Promise<string | null>;
   scanFolder(folder: string): Promise<ClipScanResult>;
+  probeClips(paths: string[]): Promise<ClipProbeResult[]>;
   startStitch(opts: StitchOptions): Promise<string>;
   cancelStitch(jobId: string): Promise<void>;
   openInExplorer(filePath: string): Promise<void>;

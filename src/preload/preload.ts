@@ -11,6 +11,7 @@ const api: Api = {
   pickOutputFile: (defaultName) =>
     ipcRenderer.invoke(CH.DIALOG_PICK_OUTPUT, defaultName),
   scanFolder: (folder) => ipcRenderer.invoke(CH.CLIPS_SCAN, folder),
+  probeClips: (paths) => ipcRenderer.invoke(CH.CLIPS_PROBE, paths),
   startStitch: (opts) => ipcRenderer.invoke(CH.JOB_START, opts),
   cancelStitch: (jobId) => ipcRenderer.invoke(CH.JOB_CANCEL, jobId),
   openInExplorer: (filePath) =>

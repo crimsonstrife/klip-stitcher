@@ -7,6 +7,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { CH } from '../../shared/ipc-channels';
 import type {
+  ClipProbeResult,
   ClipScanResult,
   FfmpegPaths,
   JobDone,
@@ -14,6 +15,7 @@ import type {
   StitchOptions,
 } from '../../shared/ipc-contract';
 import { resolveFfmpegPath, resolveFfprobePath } from '../ffmpeg/binaries';
+import { probeClips } from '../ffmpeg/probe';
 import { scanFolder } from '../services/clipScanner';
 import { runConcat } from '../ffmpeg/concat';
 
@@ -63,6 +65,13 @@ export function registerIpcHandlers(
     CH.CLIPS_SCAN,
     async (_event, folder: string): Promise<ClipScanResult> => {
       return await scanFolder(folder);
+    },
+  );
+
+  ipcMain.handle(
+    CH.CLIPS_PROBE,
+    async (_event, paths: string[]): Promise<ClipProbeResult[]> => {
+      return await probeClips(paths);
     },
   );
 
