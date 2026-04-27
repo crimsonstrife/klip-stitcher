@@ -4,6 +4,25 @@ export interface FfmpegPaths {
 }
 
 export type OutputFormat = 'mkv' | 'mp4';
+export type StitchModePreference = 'auto' | 'stream-copy' | 'reencode';
+export type ResolvedStitchMode =
+  | 'copy-mkv'
+  | 'remux-mp4'
+  | 'reencode-mkv'
+  | 'reencode-mp4';
+export type CopyCompatibilityStatus = 'compatible' | 'mismatch' | 'unknown';
+export type Mp4CompatibilityStatus = 'supported' | 'unsupported' | 'unknown';
+export type CompatibilityPropertyStatus = 'match' | 'mismatch' | 'unknown';
+export type CompatibilityPropertyKey =
+  | 'videoCodec'
+  | 'width'
+  | 'height'
+  | 'pixelFormat'
+  | 'frameRate'
+  | 'audioCodec'
+  | 'sampleRate'
+  | 'channels'
+  | 'channelLayout';
 
 export interface AppPreferences {
   lastFolder: string | null;
@@ -104,6 +123,36 @@ export interface ClipThumbnailResult {
   error: string | null;
 }
 
+export interface GapWarning {
+  previousPath: string;
+  path: string;
+  gapMs: number;
+}
+
+export interface CompatibilityValueSummary {
+  value: string;
+  count: number;
+}
+
+export interface CompatibilityPropertySummary {
+  key: CompatibilityPropertyKey;
+  label: string;
+  status: CompatibilityPropertyStatus;
+  values: CompatibilityValueSummary[];
+  missingCount: number;
+}
+
+export interface StitchAnalysis {
+  selectedClipCount: number;
+  analyzedClipCount: number;
+  missingMetadataCount: number;
+  copyCompatibility: CopyCompatibilityStatus;
+  mp4Compatibility: Mp4CompatibilityStatus;
+  mp4CompatibilityIssues: string[];
+  propertySummaries: CompatibilityPropertySummary[];
+  gaps: GapWarning[];
+}
+
 export interface PickOutputRequest {
   suggestedStem: string;
   currentOutputPath: string | null;
@@ -114,9 +163,13 @@ export interface StitchOptions {
   inputs: string[];
   /** Absolute output file path. Extension determines container. */
   output: string;
+  /** Resolved execution mode after renderer-side analysis. */
+  mode: ResolvedStitchMode;
   /** Sum of input file sizes in bytes. Used for fraction estimate
    *  (stream-copy output ≈ input bytes). */
   totalBytes: number;
+  /** Estimated stitched duration, used for time-based progress. */
+  expectedDurationMs: number | null;
 }
 
 export interface JobProgress {

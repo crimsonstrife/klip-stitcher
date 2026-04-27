@@ -25,7 +25,7 @@ import {
 import WaButton from '@awesome.me/webawesome/dist/react/button/index.js';
 import WaCard from '@awesome.me/webawesome/dist/react/card/index.js';
 import WaCheckbox from '@awesome.me/webawesome/dist/react/checkbox/index.js';
-import type { Clip, ClipSession } from '../../shared/ipc-contract';
+import type { Clip, ClipSession, GapWarning } from '../../shared/ipc-contract';
 import {
   formatBytes,
   formatClipDuration,
@@ -37,6 +37,7 @@ import {
 interface Props {
   clips: Clip[];
   sessions: ClipSession[];
+  gapWarnings: GapWarning[];
   selectedPaths: ReadonlySet<string>;
   selectedBytes: number;
   selectedDurationMs: number | null;
@@ -54,6 +55,7 @@ interface Props {
 interface SortableClipRowProps {
   clip: Clip;
   clipIndex: number;
+  gapBeforeMs: number | null;
   checked: boolean;
   onToggleClip: (clipPath: string, checked: boolean) => void;
 }
@@ -61,6 +63,7 @@ interface SortableClipRowProps {
 function SortableClipRow({
   clip,
   clipIndex,
+  gapBeforeMs,
   checked,
   onToggleClip,
 }: SortableClipRowProps) {
@@ -130,6 +133,12 @@ function SortableClipRow({
         {clip.name}
       </span>
       <div className="ks-cliprow-metadata">
+        {gapBeforeMs != null && (
+          <span className="ks-chip ks-chip-gap">
+            <FontAwesomeIcon icon={faTriangleExclamation} />
+            {formatDuration(gapBeforeMs)} gap before
+          </span>
+        )}
         {clip.metadata?.durationMs != null && (
           <span className="ks-chip ks-chip-duration">
             {formatClipDuration(clip.metadata.durationMs)}
@@ -169,6 +178,7 @@ function SortableClipRow({
 export function ClipList({
   clips,
   sessions,
+  gapWarnings,
   selectedPaths,
   selectedBytes,
   selectedDurationMs,
@@ -190,6 +200,7 @@ export function ClipList({
   const probeErrors = clips.filter((clip) => clip.probeStatus === 'error').length;
   const selectedClips = clips.filter((clip) => selectedPaths.has(clip.path));
   const selectedCount = selectedClips.length;
+  const gapWarningCount = gapWarnings.length;
   const selectedProbeErrors = selectedClips.filter(
     (clip) => clip.probeStatus === 'error',
   ).length;
@@ -197,6 +208,7 @@ export function ClipList({
   const clipIndexByPath = new Map(
     clips.map((clip, index) => [clip.path, index]),
   );
+  const gapByPath = new Map(gapWarnings.map((warning) => [warning.path, warning]));
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over || active.id === over.id) {
       return;
@@ -236,6 +248,12 @@ export function ClipList({
             <span className="ks-unparsed-warning">
               <FontAwesomeIcon icon={faTriangleExclamation} /> metadata
               unavailable for {probeErrors} clip{probeErrors === 1 ? '' : 's'}
+            </span>
+          )}
+          {gapWarningCount > 0 && (
+            <span className="ks-unparsed-warning">
+              <FontAwesomeIcon icon={faTriangleExclamation} /> {gapWarningCount}{' '}
+              timeline gap{gapWarningCount === 1 ? '' : 's'} in selected clips
             </span>
           )}
         </div>
@@ -299,6 +317,7 @@ export function ClipList({
                         key={clip.path}
                         clip={clip}
                         clipIndex={clipIndex}
+                        gapBeforeMs={gapByPath.get(clip.path)?.gapMs ?? null}
                         checked={selectedPaths.has(clip.path)}
                         onToggleClip={onToggleClip}
                       />

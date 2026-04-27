@@ -320,6 +320,16 @@ body {
   );
 }
 
+.ks-chip-gap {
+  gap: 0.35rem;
+  background: color-mix(
+    in srgb,
+    var(--wa-color-warning-fill-loud, #b07000) 16%,
+    transparent
+  );
+  color: var(--wa-color-warning-text-loud, #8a5a00);
+}
+
 .ks-chip-pending {
   color: var(--wa-color-text-quiet, #777);
 }
@@ -359,6 +369,62 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.ks-compatibility-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-block: 0.5rem 0.85rem;
+}
+
+.ks-compatibility-chip-compatible,
+.ks-compatibility-chip-supported,
+.ks-matrix-row-match th,
+.ks-matrix-row-match td {
+  color: var(--wa-color-success-text-loud, #156d44);
+}
+
+.ks-compatibility-chip-mismatch,
+.ks-compatibility-chip-unsupported,
+.ks-matrix-row-mismatch th,
+.ks-matrix-row-mismatch td {
+  color: var(--wa-color-danger-text-loud, #a61f39);
+}
+
+.ks-compatibility-chip-unknown,
+.ks-matrix-row-unknown th,
+.ks-matrix-row-unknown td {
+  color: var(--wa-color-warning-text-loud, #8a5a00);
+}
+
+.ks-matrix-wrap {
+  overflow-x: auto;
+}
+
+.ks-matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.ks-matrix-table th,
+.ks-matrix-table td {
+  text-align: left;
+  padding: 0.6rem 0.65rem;
+  border-bottom: 1px solid var(--wa-color-neutral-border-quiet, #eee);
+  vertical-align: top;
+}
+
+.ks-matrix-table thead th {
+  color: var(--wa-color-text-quiet, #777);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.ks-matrix-table tbody th {
+  font-weight: 600;
+}
+
 /* Output / stitch panel */
 .ks-output-row {
   display: flex;
@@ -376,6 +442,69 @@ body {
   min-width: 0;
   word-break: break-all;
   font-size: 0.9rem;
+}
+
+.ks-output-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-block: 0.75rem;
+  border-top: 1px solid var(--wa-color-neutral-border-quiet, #eee);
+}
+
+.ks-output-plan-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.ks-mode-options {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.ks-mode-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--wa-color-neutral-border-quiet, #ddd);
+  border-radius: 0.75rem;
+  background: rgba(127, 127, 127, 0.04);
+  cursor: pointer;
+}
+
+.ks-mode-option input {
+  margin-top: 0.15rem;
+}
+
+.ks-mode-option-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.ks-mode-option-body span {
+  color: var(--wa-color-text-quiet, #777);
+  font-size: 0.86rem;
+}
+
+.ks-output-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+  color: var(--wa-color-text-quiet, #777);
+  font-variant-numeric: tabular-nums;
+}
+
+.ks-plan-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
 }
 
 .ks-progress-section {
@@ -446,5 +575,10 @@ code {
     grid-column: 5;
     justify-content: flex-start;
     margin-left: 0;
+  }
+
+  .ks-output-plan-header {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

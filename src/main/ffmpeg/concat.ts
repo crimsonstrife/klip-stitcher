@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { app } from 'electron';
+import type { ResolvedStitchMode } from '../../shared/ipc-contract';
 import { resolveFfmpegPath } from './binaries';
 import { makeProgressReader, type ProgressTick } from './progress';
 
@@ -9,6 +10,7 @@ export interface ConcatJob {
   jobId: string;
   inputs: string[];
   output: string;
+  mode: ResolvedStitchMode;
   totalBytes: number;
   onProgress: (tick: ProgressTick) => void;
 }
@@ -39,6 +41,92 @@ async function buildConcatListFile(
   return listPath;
 }
 
+function buildFfmpegArgs(listPath: string, job: ConcatJob): string[] {
+  const inputArgs = [
+    '-hide_banner',
+    '-y',
+    '-f',
+    'concat',
+    '-safe',
+    '0',
+    '-i',
+    listPath,
+  ];
+  const progressArgs = ['-progress', 'pipe:1', '-nostats'];
+  const timestampArgs = ['-avoid_negative_ts', 'make_zero', '-fflags', '+genpts'];
+
+  switch (job.mode) {
+    case 'copy-mkv':
+      return [
+        ...inputArgs,
+        '-c',
+        'copy',
+        '-map',
+        '0',
+        ...timestampArgs,
+        ...progressArgs,
+        job.output,
+      ];
+    case 'remux-mp4':
+      return [
+        ...inputArgs,
+        '-c',
+        'copy',
+        '-map',
+        '0',
+        '-movflags',
+        '+faststart',
+        ...timestampArgs,
+        ...progressArgs,
+        job.output,
+      ];
+    case 'reencode-mkv':
+      return [
+        ...inputArgs,
+        '-c:v',
+        'libx264',
+        '-preset',
+        'medium',
+        '-crf',
+        '18',
+        '-c:a',
+        'aac',
+        '-b:a',
+        '192k',
+        '-af',
+        'aresample=async=1:first_pts=0',
+        ...timestampArgs,
+        ...progressArgs,
+        job.output,
+      ];
+    case 'reencode-mp4':
+      return [
+        ...inputArgs,
+        '-c:v',
+        'libx264',
+        '-preset',
+        'medium',
+        '-crf',
+        '18',
+        '-c:a',
+        'aac',
+        '-b:a',
+        '192k',
+        '-af',
+        'aresample=async=1:first_pts=0',
+        '-movflags',
+        '+faststart',
+        ...timestampArgs,
+        ...progressArgs,
+        job.output,
+      ];
+    default: {
+      const exhaustiveCheck: never = job.mode;
+      throw new Error(`Unsupported stitch mode: ${String(exhaustiveCheck)}`);
+    }
+  }
+}
+
 /** Run ffmpeg's stream-copy concat (`-c copy`). Honours the AbortSignal —
  *  aborting will SIGTERM the ffmpeg child and reject the promise. */
 export async function runConcat(
@@ -56,28 +144,7 @@ export async function runConcat(
   const startedAt = Date.now();
 
   return await new Promise<ConcatResult>((resolve, reject) => {
-    const args = [
-      '-hide_banner',
-      '-y',
-      '-f',
-      'concat',
-      '-safe',
-      '0',
-      '-i',
-      listPath,
-      '-c',
-      'copy',
-      '-map',
-      '0',
-      '-avoid_negative_ts',
-      'make_zero',
-      '-fflags',
-      '+genpts',
-      '-progress',
-      'pipe:1',
-      '-nostats',
-      job.output,
-    ];
+    const args = buildFfmpegArgs(listPath, job);
 
     const child = spawn(ffmpeg, args, {
       stdio: ['ignore', 'pipe', 'pipe'],

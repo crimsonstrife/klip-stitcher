@@ -4,6 +4,7 @@ import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import WaCallout from '@awesome.me/webawesome/dist/react/callout/index.js';
 import { DropZone } from './components/DropZone';
 import { ClipList } from './components/ClipList';
+import { CodecMatrixPanel } from './components/CodecMatrixPanel';
 import { StitchPanel } from './components/StitchPanel';
 import type {
   Clip,
@@ -12,7 +13,12 @@ import type {
   ClipThumbnailResult,
   JobDone,
   JobProgress,
+  StitchModePreference,
 } from '../shared/ipc-contract';
+import {
+  analyzeStitchSelection,
+  resolveStitchPlan,
+} from '../shared/stitch-analysis';
 
 interface ActiveJob {
   id: string;
@@ -206,6 +212,7 @@ export function App() {
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [output, setOutput] = useState<string | null>(null);
+  const [stitchMode, setStitchMode] = useState<StitchModePreference>('auto');
   const [job, setJob] = useState<ActiveJob | null>(null);
   const [result, setResult] = useState<JobDone | null>(null);
   const scanTokenRef = useRef(0);
@@ -249,6 +256,9 @@ export function App() {
   const selectedBytes = selectedClips.reduce((sum, clip) => sum + clip.size, 0);
   const totalDurationMs = sumDurationsOrNull(clips);
   const selectedDurationMs = sumDurationsOrNull(selectedClips);
+  const selectedProbePending = selectedClips.some(
+    (clip) => clip.probeStatus === 'idle' || clip.probeStatus === 'probing',
+  );
   const probingMetadata = clips.some(
     (clip) => clip.probeStatus === 'idle' || clip.probeStatus === 'probing',
   );
@@ -260,6 +270,9 @@ export function App() {
   const metadataErrorCount = clips.filter(
     (clip) => clip.probeStatus === 'error',
   ).length;
+  const stitchAnalysis =
+    selectedClips.length > 0 ? analyzeStitchSelection(selectedClips) : null;
+  const stitchPlan = resolveStitchPlan(output, stitchMode, stitchAnalysis);
 
   const scanFolderPath = async (folderPath: string) => {
     const scanToken = scanTokenRef.current + 1;
@@ -363,12 +376,22 @@ export function App() {
   };
 
   const handleStitch = async () => {
-    if (!output || selectedClips.length === 0) return;
+    if (
+      !output ||
+      selectedClips.length === 0 ||
+      selectedProbePending ||
+      !stitchPlan.canStart ||
+      !stitchPlan.resolvedMode
+    ) {
+      return;
+    }
     setResult(null);
     const id = await window.api.startStitch({
       inputs: selectedClips.map((c) => c.path),
       output,
+      mode: stitchPlan.resolvedMode,
       totalBytes: selectedBytes,
+      expectedDurationMs: selectedDurationMs,
     });
     setJob({ id, progress: null, totalBytes: selectedBytes });
   };
@@ -451,6 +474,7 @@ export function App() {
           <ClipList
             clips={clips}
             sessions={sessions}
+            gapWarnings={stitchAnalysis?.gaps ?? []}
             selectedPaths={selectedClipPaths}
             selectedBytes={selectedBytes}
             selectedDurationMs={selectedDurationMs}
@@ -460,14 +484,23 @@ export function App() {
             onToggleClip={handleToggleClip}
             onToggleSession={handleToggleSession}
           />
+          <CodecMatrixPanel
+            analysis={stitchAnalysis}
+            selectedProbePending={selectedProbePending}
+          />
           <StitchPanel
             output={output}
             clipCount={selectedClips.length}
             totalBytes={job?.totalBytes ?? selectedBytes}
+            selectedDurationMs={selectedDurationMs}
+            selectedProbePending={selectedProbePending}
+            stitchMode={stitchMode}
+            stitchPlan={stitchPlan}
             running={!!job}
             progress={job?.progress ?? null}
             result={result}
             onPickOutput={handlePickOutput}
+            onSetStitchMode={setStitchMode}
             onStitch={handleStitch}
             onCancel={handleCancel}
             onOpenOutput={handleOpenOutput}

@@ -154,19 +154,26 @@ export function registerIpcHandlers(
           jobId,
           inputs: opts.inputs,
           output: opts.output,
+          mode: opts.mode,
           totalBytes: opts.totalBytes,
           onProgress: (tick) => {
             const bytes = tick.totalSize ?? 0;
-            const fraction =
+            const timeFraction =
+              opts.expectedDurationMs != null &&
+              opts.expectedDurationMs > 0 &&
+              tick.outTimeMs != null
+                ? Math.min(1, tick.outTimeMs / opts.expectedDurationMs)
+                : null;
+            const byteFraction =
               opts.totalBytes > 0
                 ? Math.min(1, bytes / opts.totalBytes)
-                : 0;
+                : null;
             sendProgress({
               jobId,
               bytesWritten: bytes,
               outTimeMs: tick.outTimeMs ?? 0,
               speed: tick.speed ?? '',
-              fraction,
+              fraction: timeFraction ?? byteFraction ?? 0,
             });
           },
         },
