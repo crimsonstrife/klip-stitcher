@@ -170,7 +170,7 @@ body {
 
 .ks-cliprow {
   display: grid;
-  grid-template-columns: auto auto auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto auto auto auto minmax(0, 1fr) auto auto;
   gap: 0.75rem;
   align-items: center;
   padding: 0.4rem 0.5rem;
@@ -191,6 +191,33 @@ body {
 
 .ks-cliprow-icon {
   color: var(--wa-color-text-quiet, #aaa);
+}
+
+.ks-cliprow-drag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border: none;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--wa-color-text-quiet, #888);
+  cursor: grab;
+  padding: 0;
+}
+
+.ks-cliprow-drag:hover {
+  background: rgba(127, 127, 127, 0.12);
+}
+
+.ks-cliprow-drag:active {
+  cursor: grabbing;
+}
+
+.ks-cliprow-drag:focus-visible {
+  outline: 2px solid var(--wa-color-brand-fill-loud, #4a8cff);
+  outline-offset: 2px;
 }
 
 .ks-cliprow-check {
@@ -307,11 +334,23 @@ body {
 }
 
 .ks-cliprow-excluded .ks-cliprow-icon,
+.ks-cliprow-excluded .ks-cliprow-drag,
 .ks-cliprow-excluded .ks-cliprow-thumb,
 .ks-cliprow-excluded .ks-cliprow-metadata,
 .ks-cliprow-excluded .ks-cliprow-name,
 .ks-cliprow-excluded .ks-cliprow-size {
   opacity: 0.45;
+}
+
+.ks-cliprow-dragging {
+  position: relative;
+  z-index: 2;
+  background: color-mix(
+    in srgb,
+    var(--wa-color-brand-fill-loud, #4a8cff) 8%,
+    var(--wa-color-surface-default, canvas)
+  );
+  box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.12);
 }
 
 .ks-cliplist-footer {
@@ -399,12 +438,12 @@ code {
   }
 
   .ks-cliprow {
-    grid-template-columns: auto auto auto minmax(0, 1fr);
+    grid-template-columns: auto auto auto auto minmax(0, 1fr);
   }
 
   .ks-cliprow-metadata,
   .ks-cliprow-size {
-    grid-column: 4;
+    grid-column: 5;
     justify-content: flex-start;
     margin-left: 0;
   }

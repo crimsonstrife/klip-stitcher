@@ -129,6 +129,70 @@ function sumDurationsOrNull(clips: Clip[]): number | null {
   );
 }
 
+function moveArrayItem<T>(items: T[], from: number, to: number): T[] {
+  if (
+    from === to ||
+    from < 0 ||
+    to < 0 ||
+    from >= items.length ||
+    to >= items.length
+  ) {
+    return items;
+  }
+
+  const next = [...items];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
+function reorderClipsWithinSession(
+  scanResult: ClipScanResult,
+  sessionId: string,
+  activePath: string,
+  overPath: string,
+): ClipScanResult {
+  const session = scanResult.sessions.find((item) => item.id === sessionId);
+  if (!session) {
+    return scanResult;
+  }
+
+  const activeIndex = session.clipPaths.indexOf(activePath);
+  const overIndex = session.clipPaths.indexOf(overPath);
+  if (activeIndex < 0 || overIndex < 0 || activeIndex === overIndex) {
+    return scanResult;
+  }
+
+  const reorderedClipPaths = moveArrayItem(
+    session.clipPaths,
+    activeIndex,
+    overIndex,
+  );
+  const clipByPath = new Map(scanResult.clips.map((clip) => [clip.path, clip]));
+  const reorderedSessionClips = reorderedClipPaths
+    .map((clipPath) => clipByPath.get(clipPath))
+    .filter((clip): clip is Clip => Boolean(clip));
+
+  let sessionClipIndex = 0;
+
+  return {
+    clips: scanResult.clips.map((clip) => {
+      if (clip.sessionId !== sessionId) {
+        return clip;
+      }
+
+      const reorderedClip = reorderedSessionClips[sessionClipIndex];
+      sessionClipIndex += 1;
+      return reorderedClip ?? clip;
+    }),
+    sessions: scanResult.sessions.map((item) =>
+      item.id === sessionId
+        ? { ...item, clipPaths: reorderedClipPaths }
+        : item,
+    ),
+  };
+}
+
 export function App() {
   const [folder, setFolder] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<ClipScanResult>({
@@ -343,6 +407,16 @@ export function App() {
     });
   };
 
+  const handleReorderSession = (
+    sessionId: string,
+    activePath: string,
+    overPath: string,
+  ) => {
+    setScanResult((current) =>
+      reorderClipsWithinSession(current, sessionId, activePath, overPath),
+    );
+  };
+
   return (
     <main className="ks-app">
       <header className="ks-header">
@@ -382,6 +456,7 @@ export function App() {
             selectedDurationMs={selectedDurationMs}
             probingMetadata={probingMetadata}
             generatingThumbnails={generatingThumbnails}
+            onReorderSession={handleReorderSession}
             onToggleClip={handleToggleClip}
             onToggleSession={handleToggleSession}
           />
