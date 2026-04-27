@@ -15,6 +15,7 @@ import type {
   JobProgress,
   StitchModePreference,
 } from '../shared/ipc-contract';
+import { parseSplitPoints } from '../shared/split-points';
 import {
   analyzeStitchSelection,
   resolveStitchPlan,
@@ -213,6 +214,8 @@ export function App() {
   const [scanError, setScanError] = useState<string | null>(null);
   const [output, setOutput] = useState<string | null>(null);
   const [stitchMode, setStitchMode] = useState<StitchModePreference>('auto');
+  const [splitEnabled, setSplitEnabled] = useState(false);
+  const [splitTimestampsText, setSplitTimestampsText] = useState('');
   const [job, setJob] = useState<ActiveJob | null>(null);
   const [result, setResult] = useState<JobDone | null>(null);
   const scanTokenRef = useRef(0);
@@ -273,6 +276,25 @@ export function App() {
   const stitchAnalysis =
     selectedClips.length > 0 ? analyzeStitchSelection(selectedClips) : null;
   const stitchPlan = resolveStitchPlan(output, stitchMode, stitchAnalysis);
+  const hasSplitInput = splitTimestampsText.trim() !== '';
+  const parsedSplitPoints = parseSplitPoints(
+    splitTimestampsText,
+    selectedDurationMs,
+  );
+  const splitErrors =
+    splitEnabled && parsedSplitPoints.pointsMs.length === 0
+      ? splitTimestampsText.trim() === ''
+        ? ['Add at least one split timestamp.']
+        : parsedSplitPoints.errors
+      : splitEnabled
+        ? parsedSplitPoints.errors
+        : [];
+  const splitWarnings = splitEnabled && (hasSplitInput || parsedSplitPoints.pointsMs.length > 0)
+    ? [
+        'Split files are created after the main stitch and use fast stream copy, so cut points land on the nearest keyframe.',
+        ...parsedSplitPoints.warnings,
+      ]
+    : [];
 
   const scanFolderPath = async (folderPath: string) => {
     const scanToken = scanTokenRef.current + 1;
@@ -381,7 +403,8 @@ export function App() {
       selectedClips.length === 0 ||
       selectedProbePending ||
       !stitchPlan.canStart ||
-      !stitchPlan.resolvedMode
+      !stitchPlan.resolvedMode ||
+      splitErrors.length > 0
     ) {
       return;
     }
@@ -389,6 +412,7 @@ export function App() {
     const id = await window.api.startStitch({
       inputs: selectedClips.map((c) => c.path),
       output,
+      splitPointsMs: splitEnabled ? parsedSplitPoints.pointsMs : [],
       mode: stitchPlan.resolvedMode,
       totalBytes: selectedBytes,
       expectedDurationMs: selectedDurationMs,
@@ -496,11 +520,18 @@ export function App() {
             selectedProbePending={selectedProbePending}
             stitchMode={stitchMode}
             stitchPlan={stitchPlan}
+            splitEnabled={splitEnabled}
+            splitTimestampsText={splitTimestampsText}
+            splitPointCount={parsedSplitPoints.pointsMs.length}
+            splitErrors={splitErrors}
+            splitWarnings={splitWarnings}
             running={!!job}
             progress={job?.progress ?? null}
             result={result}
             onPickOutput={handlePickOutput}
             onSetStitchMode={setStitchMode}
+            onSetSplitEnabled={setSplitEnabled}
+            onSetSplitTimestampsText={setSplitTimestampsText}
             onStitch={handleStitch}
             onCancel={handleCancel}
             onOpenOutput={handleOpenOutput}

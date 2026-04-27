@@ -24,6 +24,7 @@ import { probeClips } from '../ffmpeg/probe';
 import { generateThumbnails } from '../ffmpeg/thumbnail';
 import { scanFolder } from '../services/clipScanner';
 import { runConcat } from '../ffmpeg/concat';
+import { runSplitSegments } from '../ffmpeg/split';
 import {
   getPreferences,
   rememberLastFolder,
@@ -52,6 +53,13 @@ function buildDefaultOutputPath(
     return path.join(prefs.lastFolder, filename);
   }
   return filename;
+}
+
+function clampFraction(value: number | null): number {
+  if (value == null || !Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(1, value));
 }
 
 export function registerIpcHandlers(
@@ -141,6 +149,8 @@ export function registerIpcHandlers(
       const jobId = randomUUID();
       const ctrl = new AbortController();
       jobs.set(jobId, ctrl);
+      const startedAt = Date.now();
+      const hasSplitStage = opts.splitPointsMs.length > 0;
 
       const sendProgress = (p: JobProgress) => {
         getMainWindow()?.webContents.send(CH.JOB_PROGRESS, p);
@@ -149,58 +159,101 @@ export function registerIpcHandlers(
         getMainWindow()?.webContents.send(CH.JOB_DONE, d);
       };
 
-      runConcat(
-        {
-          jobId,
-          inputs: opts.inputs,
-          output: opts.output,
-          mode: opts.mode,
-          totalBytes: opts.totalBytes,
-          onProgress: (tick) => {
-            const bytes = tick.totalSize ?? 0;
-            const timeFraction =
-              opts.expectedDurationMs != null &&
-              opts.expectedDurationMs > 0 &&
-              tick.outTimeMs != null
-                ? Math.min(1, tick.outTimeMs / opts.expectedDurationMs)
-                : null;
-            const byteFraction =
-              opts.totalBytes > 0
-                ? Math.min(1, bytes / opts.totalBytes)
-                : null;
-            sendProgress({
+      void (async () => {
+        let splitOutputs: string[] = [];
+
+        const computeStageFraction = (
+          bytes: number,
+          outTimeMs: number | null | undefined,
+        ): number => {
+          const timeFraction =
+            opts.expectedDurationMs != null &&
+            opts.expectedDurationMs > 0 &&
+            outTimeMs != null
+              ? outTimeMs / opts.expectedDurationMs
+              : null;
+          const byteFraction =
+            opts.totalBytes > 0 ? bytes / opts.totalBytes : null;
+          return clampFraction(timeFraction ?? byteFraction);
+        };
+
+        try {
+          await runConcat(
+            {
               jobId,
-              bytesWritten: bytes,
-              outTimeMs: tick.outTimeMs ?? 0,
-              speed: tick.speed ?? '',
-              fraction: timeFraction ?? byteFraction ?? 0,
-            });
-          },
-        },
-        ctrl.signal,
-      )
-        .then((result) => {
+              inputs: opts.inputs,
+              output: opts.output,
+              mode: opts.mode,
+              totalBytes: opts.totalBytes,
+              onProgress: (tick) => {
+                const stageFraction = computeStageFraction(
+                  tick.totalSize ?? 0,
+                  tick.outTimeMs,
+                );
+                sendProgress({
+                  jobId,
+                  stage: 'stitch',
+                  stageLabel: hasSplitStage
+                    ? 'Stitching full timeline'
+                    : 'Stitching',
+                  bytesWritten: tick.totalSize ?? 0,
+                  outTimeMs: tick.outTimeMs ?? 0,
+                  speed: tick.speed ?? '',
+                  fraction: hasSplitStage ? stageFraction * 0.5 : stageFraction,
+                });
+              },
+            },
+            ctrl.signal,
+          );
+
+          if (hasSplitStage) {
+            const splitResult = await runSplitSegments(
+              {
+                input: opts.output,
+                splitPointsMs: opts.splitPointsMs,
+                onProgress: (tick) => {
+                  const stageFraction = computeStageFraction(
+                    tick.totalSize ?? 0,
+                    tick.outTimeMs,
+                  );
+                  sendProgress({
+                    jobId,
+                    stage: 'split',
+                    stageLabel: `Creating ${opts.splitPointsMs.length + 1} split files`,
+                    bytesWritten: tick.totalSize ?? 0,
+                    outTimeMs: tick.outTimeMs ?? 0,
+                    speed: tick.speed ?? '',
+                    fraction: 0.5 + stageFraction * 0.5,
+                  });
+                },
+              },
+              ctrl.signal,
+            );
+            splitOutputs = splitResult.outputs;
+          }
+
           sendDone({
             jobId,
             status: 'success',
-            output: result.output,
-            durationMs: result.durationMs,
+            output: opts.output,
+            splitOutputs,
+            durationMs: Date.now() - startedAt,
           });
-        })
-        .catch((err: Error & { cancelled?: boolean }) => {
-          if (err.cancelled || ctrl.signal.aborted) {
+        } catch (err) {
+          const typedError = err as Error & { cancelled?: boolean };
+          if (typedError.cancelled || ctrl.signal.aborted) {
             sendDone({ jobId, status: 'cancelled' });
           } else {
             sendDone({
               jobId,
               status: 'error',
-              error: String(err?.message ?? err),
+              error: String(typedError?.message ?? typedError),
             });
           }
-        })
-        .finally(() => {
+        } finally {
           jobs.delete(jobId);
-        });
+        }
+      })();
 
       return jobId;
     },

@@ -27,11 +27,18 @@ interface Props {
   selectedProbePending: boolean;
   stitchMode: StitchModePreference;
   stitchPlan: StitchPlan;
+  splitEnabled: boolean;
+  splitTimestampsText: string;
+  splitPointCount: number;
+  splitErrors: string[];
+  splitWarnings: string[];
   running: boolean;
   progress: JobProgress | null;
   result: JobDone | null;
   onPickOutput: () => void;
   onSetStitchMode: (mode: StitchModePreference) => void;
+  onSetSplitEnabled: (enabled: boolean) => void;
+  onSetSplitTimestampsText: (value: string) => void;
   onStitch: () => void;
   onCancel: () => void;
   onOpenOutput: (path: string) => void;
@@ -70,11 +77,18 @@ export function StitchPanel(props: Props) {
     selectedProbePending,
     stitchMode,
     stitchPlan,
+    splitEnabled,
+    splitTimestampsText,
+    splitPointCount,
+    splitErrors,
+    splitWarnings,
     running,
     progress,
     result,
     onPickOutput,
     onSetStitchMode,
+    onSetSplitEnabled,
+    onSetSplitTimestampsText,
     onStitch,
     onCancel,
     onOpenOutput,
@@ -82,7 +96,11 @@ export function StitchPanel(props: Props) {
 
   const pct = progress ? Math.round(progress.fraction * 100) : 0;
   const stitchDisabled =
-    !output || clipCount === 0 || selectedProbePending || !stitchPlan.canStart;
+    !output ||
+    clipCount === 0 ||
+    selectedProbePending ||
+    !stitchPlan.canStart ||
+    splitErrors.length > 0;
 
   return (
     <WaCard className="ks-card">
@@ -141,6 +159,51 @@ export function StitchPanel(props: Props) {
         {selectedDurationMs != null && <span>{formatDuration(selectedDurationMs)}</span>}
       </div>
 
+      <div className="ks-output-plan">
+        <div className="ks-output-plan-header">
+          <strong>Post-stitch split</strong>
+          {splitEnabled && splitPointCount > 0 && (
+            <span className="ks-probing-note">
+              {splitPointCount} split point{splitPointCount === 1 ? '' : 's'} ·{' '}
+              {splitPointCount + 1} files
+            </span>
+          )}
+        </div>
+        <label className="ks-mode-option">
+          <input
+            type="checkbox"
+            checked={splitEnabled}
+            disabled={running}
+            onChange={(event) => onSetSplitEnabled(event.currentTarget.checked)}
+          />
+          <span className="ks-mode-option-body">
+            <strong>Create split files after stitching</strong>
+            <span>
+              Enter VOD marker times to create numbered parts beside the stitched
+              output.
+            </span>
+          </span>
+        </label>
+        {splitEnabled && (
+          <div className="ks-split-editor">
+            <textarea
+              className="ks-split-textarea"
+              value={splitTimestampsText}
+              disabled={running}
+              placeholder={'00:15:32\n01:02:10\n1:45:00.500'}
+              onChange={(event) =>
+                onSetSplitTimestampsText(event.currentTarget.value)
+              }
+            />
+            <div className="ks-probing-note">
+              One timestamp per line, or separate with commas. Accepted formats:
+              <code>HH:MM:SS</code>, <code>MM:SS</code>, <code>SS</code>, with
+              optional decimals.
+            </div>
+          </div>
+        )}
+      </div>
+
       {!running && selectedProbePending && (
         <WaCallout variant="warning" className="ks-result">
           <FontAwesomeIcon icon={faTriangleExclamation} slot="icon" />
@@ -171,10 +234,33 @@ export function StitchPanel(props: Props) {
         </WaCallout>
       )}
 
+      {!running && !selectedProbePending && splitEnabled && splitErrors.length > 0 && (
+        <WaCallout variant="danger" className="ks-result">
+          <FontAwesomeIcon icon={faTriangleExclamation} slot="icon" />
+          <div className="ks-plan-lines">
+            {splitErrors.map((message) => (
+              <div key={message}>{message}</div>
+            ))}
+          </div>
+        </WaCallout>
+      )}
+
+      {!running && !selectedProbePending && splitEnabled && splitWarnings.length > 0 && (
+        <WaCallout variant="warning" className="ks-result">
+          <FontAwesomeIcon icon={faTriangleExclamation} slot="icon" />
+          <div className="ks-plan-lines">
+            {splitWarnings.map((message) => (
+              <div key={message}>{message}</div>
+            ))}
+          </div>
+        </WaCallout>
+      )}
+
       {running && (
         <div className="ks-progress-section">
           <WaProgressBar value={pct}>{pct}%</WaProgressBar>
           <div className="ks-progress-stats">
+            {progress?.stageLabel && <span>{progress.stageLabel}</span>}
             {progress?.speed && <span>speed: {progress.speed}</span>}
             <span>
               {formatBytes(progress?.bytesWritten ?? 0)}
@@ -195,6 +281,13 @@ export function StitchPanel(props: Props) {
             <div>
               Done in {formatDuration(result.durationMs)} —{' '}
               <code>{result.output}</code>
+              {result.splitOutputs.length > 0 && (
+                <>
+                  {' · '}
+                  {result.splitOutputs.length} split file
+                  {result.splitOutputs.length === 1 ? '' : 's'}
+                </>
+              )}
             </div>
             <WaButton
               size="small"

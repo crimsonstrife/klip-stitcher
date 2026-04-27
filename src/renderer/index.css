@@ -492,6 +492,32 @@ body {
   font-size: 0.86rem;
 }
 
+.ks-split-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.ks-split-textarea {
+  width: 100%;
+  min-height: 8rem;
+  resize: vertical;
+  border: 1px solid var(--wa-color-neutral-border-quiet, #ddd);
+  border-radius: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  background: rgba(127, 127, 127, 0.04);
+  color: inherit;
+  font: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+.ks-split-textarea:focus-visible {
+  outline: 2px solid var(--wa-color-brand-fill-loud, #4a8cff);
+  outline-offset: 2px;
+}
+
 .ks-output-stats {
   display: flex;
   flex-wrap: wrap;

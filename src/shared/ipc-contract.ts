@@ -5,6 +5,7 @@ export interface FfmpegPaths {
 
 export type OutputFormat = 'mkv' | 'mp4';
 export type StitchModePreference = 'auto' | 'stream-copy' | 'reencode';
+export type JobStage = 'stitch' | 'split';
 export type ResolvedStitchMode =
   | 'copy-mkv'
   | 'remux-mp4'
@@ -163,6 +164,8 @@ export interface StitchOptions {
   inputs: string[];
   /** Absolute output file path. Extension determines container. */
   output: string;
+  /** Optional post-stitch split points, in timeline milliseconds. */
+  splitPointsMs: number[];
   /** Resolved execution mode after renderer-side analysis. */
   mode: ResolvedStitchMode;
   /** Sum of input file sizes in bytes. Used for fraction estimate
@@ -174,13 +177,17 @@ export interface StitchOptions {
 
 export interface JobProgress {
   jobId: string;
+  /** Current phase of the job pipeline. */
+  stage: JobStage;
+  /** Friendly text shown in the UI for the current phase. */
+  stageLabel: string;
   /** Bytes written to output so far. */
   bytesWritten: number;
   /** Output time in ms (from `out_time_ms=` in -progress pipe:1). */
   outTimeMs: number;
   /** Speed multiplier as ffmpeg reports it, e.g. "8.5x". */
   speed: string;
-  /** Approximate completion fraction 0..1 (bytesWritten / totalBytes). */
+  /** Approximate overall completion fraction 0..1 for the active job. */
   fraction: number;
 }
 
@@ -189,6 +196,7 @@ export type JobDone =
       jobId: string;
       status: 'success';
       output: string;
+      splitOutputs: string[];
       durationMs: number;
     }
   | { jobId: string; status: 'error'; error: string }
