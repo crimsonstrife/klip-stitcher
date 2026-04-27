@@ -15,8 +15,10 @@ if (started) {
   app.quit();
 }
 
+let mainWindow: BrowserWindow | null = null;
+
 const createWindow = () => {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
@@ -62,7 +64,7 @@ const createWindow = () => {
 };
 
 app.whenReady().then(() => {
-  registerIpcHandlers(ipcMain);
+  registerIpcHandlers(ipcMain, () => mainWindow);
   createWindow();
 
   app.on('activate', () => {
