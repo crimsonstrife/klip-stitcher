@@ -13,8 +13,10 @@ import type {
   ClipThumbnailResult,
   JobDone,
   JobProgress,
+  PostStitchMode,
   StitchModePreference,
 } from '../shared/ipc-contract';
+import { parseVodChapterExports } from '../shared/chapter-exports';
 import { parseSplitPoints } from '../shared/split-points';
 import {
   analyzeStitchSelection,
@@ -136,6 +138,18 @@ function sumDurationsOrNull(clips: Clip[]): number | null {
   );
 }
 
+function parseNonNegativeSeconds(value: string): number | null {
+  const trimmed = value.trim();
+  if (trimmed === '') {
+    return null;
+  }
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return null;
+  }
+  return parsed;
+}
+
 function moveArrayItem<T>(items: T[], from: number, to: number): T[] {
   if (
     from === to ||
@@ -214,8 +228,13 @@ export function App() {
   const [scanError, setScanError] = useState<string | null>(null);
   const [output, setOutput] = useState<string | null>(null);
   const [stitchMode, setStitchMode] = useState<StitchModePreference>('auto');
-  const [splitEnabled, setSplitEnabled] = useState(false);
+  const [postStitchEnabled, setPostStitchEnabled] = useState(false);
+  const [postStitchMode, setPostStitchMode] =
+    useState<PostStitchMode>('split-points');
   const [splitTimestampsText, setSplitTimestampsText] = useState('');
+  const [chapterMarkersText, setChapterMarkersText] = useState('');
+  const [chapterPreRollSeconds, setChapterPreRollSeconds] = useState('3');
+  const [chapterPostRollSeconds, setChapterPostRollSeconds] = useState('3');
   const [job, setJob] = useState<ActiveJob | null>(null);
   const [result, setResult] = useState<JobDone | null>(null);
   const scanTokenRef = useRef(0);
@@ -282,19 +301,76 @@ export function App() {
     selectedDurationMs,
   );
   const splitErrors =
-    splitEnabled && parsedSplitPoints.pointsMs.length === 0
+    postStitchEnabled &&
+    postStitchMode === 'split-points' &&
+    parsedSplitPoints.pointsMs.length === 0
       ? splitTimestampsText.trim() === ''
         ? ['Add at least one split timestamp.']
         : parsedSplitPoints.errors
-      : splitEnabled
+      : postStitchEnabled && postStitchMode === 'split-points'
         ? parsedSplitPoints.errors
         : [];
-  const splitWarnings = splitEnabled && (hasSplitInput || parsedSplitPoints.pointsMs.length > 0)
+  const splitWarnings =
+    postStitchEnabled &&
+    postStitchMode === 'split-points' &&
+    (hasSplitInput || parsedSplitPoints.pointsMs.length > 0)
     ? [
         'Split files are created after the main stitch and use fast stream copy, so cut points land on the nearest keyframe.',
         ...parsedSplitPoints.warnings,
       ]
     : [];
+  const chapterPreRoll = parseNonNegativeSeconds(chapterPreRollSeconds);
+  const chapterPostRoll = parseNonNegativeSeconds(chapterPostRollSeconds);
+  const chapterPaddingErrors: string[] = [];
+  if (
+    postStitchEnabled &&
+    postStitchMode === 'chapter-exports' &&
+    chapterPreRoll == null
+  ) {
+    chapterPaddingErrors.push('Pre-roll must be a non-negative number of seconds.');
+  }
+  if (
+    postStitchEnabled &&
+    postStitchMode === 'chapter-exports' &&
+    chapterPostRoll == null
+  ) {
+    chapterPaddingErrors.push('Post-roll must be a non-negative number of seconds.');
+  }
+  const parsedChapterExports =
+    postStitchEnabled &&
+    postStitchMode === 'chapter-exports' &&
+    chapterPaddingErrors.length === 0
+      ? parseVodChapterExports({
+          rawValue: chapterMarkersText,
+          stitchedOutput: output,
+          durationMs: selectedDurationMs,
+          preRollMs: Math.round((chapterPreRoll ?? 0) * 1000),
+          postRollMs: Math.round((chapterPostRoll ?? 0) * 1000),
+        })
+      : { exports: [], errors: [], warnings: [] };
+  const chapterErrors =
+    postStitchEnabled && postStitchMode === 'chapter-exports'
+      ? [...chapterPaddingErrors, ...parsedChapterExports.errors]
+      : [];
+  const chapterWarnings =
+    postStitchEnabled &&
+    postStitchMode === 'chapter-exports' &&
+    chapterMarkersText.trim() !== ''
+      ? [
+          'Chapter files are created with fast stream copy, so padded boundaries land on the nearest keyframe.',
+          ...parsedChapterExports.warnings,
+        ]
+      : [];
+  const postStitchErrors =
+    postStitchMode === 'chapter-exports' ? chapterErrors : splitErrors;
+  const postStitchWarnings =
+    postStitchMode === 'chapter-exports' ? chapterWarnings : splitWarnings;
+  const postStitchOutputCount =
+    postStitchMode === 'chapter-exports'
+      ? parsedChapterExports.exports.length
+      : parsedSplitPoints.pointsMs.length > 0
+        ? parsedSplitPoints.pointsMs.length + 1
+        : 0;
 
   const scanFolderPath = async (folderPath: string) => {
     const scanToken = scanTokenRef.current + 1;
@@ -404,7 +480,7 @@ export function App() {
       selectedProbePending ||
       !stitchPlan.canStart ||
       !stitchPlan.resolvedMode ||
-      splitErrors.length > 0
+      postStitchErrors.length > 0
     ) {
       return;
     }
@@ -412,7 +488,20 @@ export function App() {
     const id = await window.api.startStitch({
       inputs: selectedClips.map((c) => c.path),
       output,
-      splitPointsMs: splitEnabled ? parsedSplitPoints.pointsMs : [],
+      postStitchMode: postStitchEnabled ? postStitchMode : 'none',
+      splitPointsMs:
+        postStitchEnabled && postStitchMode === 'split-points'
+          ? parsedSplitPoints.pointsMs
+          : [],
+      chapterExports:
+        postStitchEnabled && postStitchMode === 'chapter-exports'
+          ? parsedChapterExports.exports
+          : [],
+      postStitchLabel: postStitchEnabled
+        ? postStitchMode === 'chapter-exports'
+          ? 'chapter file'
+          : 'split file'
+        : null,
       mode: stitchPlan.resolvedMode,
       totalBytes: selectedBytes,
       expectedDurationMs: selectedDurationMs,
@@ -520,18 +609,26 @@ export function App() {
             selectedProbePending={selectedProbePending}
             stitchMode={stitchMode}
             stitchPlan={stitchPlan}
-            splitEnabled={splitEnabled}
+            postStitchEnabled={postStitchEnabled}
+            postStitchMode={postStitchMode}
             splitTimestampsText={splitTimestampsText}
-            splitPointCount={parsedSplitPoints.pointsMs.length}
-            splitErrors={splitErrors}
-            splitWarnings={splitWarnings}
+            chapterMarkersText={chapterMarkersText}
+            chapterPreRollSeconds={chapterPreRollSeconds}
+            chapterPostRollSeconds={chapterPostRollSeconds}
+            postStitchOutputCount={postStitchOutputCount}
+            postStitchErrors={postStitchErrors}
+            postStitchWarnings={postStitchWarnings}
             running={!!job}
             progress={job?.progress ?? null}
             result={result}
             onPickOutput={handlePickOutput}
             onSetStitchMode={setStitchMode}
-            onSetSplitEnabled={setSplitEnabled}
+            onSetPostStitchEnabled={setPostStitchEnabled}
+            onSetPostStitchMode={setPostStitchMode}
             onSetSplitTimestampsText={setSplitTimestampsText}
+            onSetChapterMarkersText={setChapterMarkersText}
+            onSetChapterPreRollSeconds={setChapterPreRollSeconds}
+            onSetChapterPostRollSeconds={setChapterPostRollSeconds}
             onStitch={handleStitch}
             onCancel={handleCancel}
             onOpenOutput={handleOpenOutput}

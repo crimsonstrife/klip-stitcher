@@ -24,6 +24,8 @@ import { probeClips } from '../ffmpeg/probe';
 import { generateThumbnails } from '../ffmpeg/thumbnail';
 import { scanFolder } from '../services/clipScanner';
 import { runConcat } from '../ffmpeg/concat';
+import { formatJobError } from '../ffmpeg/errors';
+import { runExtractRanges } from '../ffmpeg/extract';
 import { runSplitSegments } from '../ffmpeg/split';
 import {
   getPreferences,
@@ -150,7 +152,12 @@ export function registerIpcHandlers(
       const ctrl = new AbortController();
       jobs.set(jobId, ctrl);
       const startedAt = Date.now();
-      const hasSplitStage = opts.splitPointsMs.length > 0;
+      const hasPostStitchStage =
+        opts.postStitchMode === 'split-points'
+          ? opts.splitPointsMs.length > 0
+          : opts.postStitchMode === 'chapter-exports'
+            ? opts.chapterExports.length > 0
+            : false;
 
       const sendProgress = (p: JobProgress) => {
         getMainWindow()?.webContents.send(CH.JOB_PROGRESS, p);
@@ -160,7 +167,7 @@ export function registerIpcHandlers(
       };
 
       void (async () => {
-        let splitOutputs: string[] = [];
+        let extraOutputs: string[] = [];
 
         const computeStageFraction = (
           bytes: number,
@@ -193,20 +200,22 @@ export function registerIpcHandlers(
                 sendProgress({
                   jobId,
                   stage: 'stitch',
-                  stageLabel: hasSplitStage
+                  stageLabel: hasPostStitchStage
                     ? 'Stitching full timeline'
                     : 'Stitching',
                   bytesWritten: tick.totalSize ?? 0,
                   outTimeMs: tick.outTimeMs ?? 0,
                   speed: tick.speed ?? '',
-                  fraction: hasSplitStage ? stageFraction * 0.5 : stageFraction,
+                  fraction: hasPostStitchStage
+                    ? stageFraction * 0.5
+                    : stageFraction,
                 });
               },
             },
             ctrl.signal,
           );
 
-          if (hasSplitStage) {
+          if (opts.postStitchMode === 'split-points' && opts.splitPointsMs.length > 0) {
             const splitResult = await runSplitSegments(
               {
                 input: opts.output,
@@ -219,7 +228,11 @@ export function registerIpcHandlers(
                   sendProgress({
                     jobId,
                     stage: 'split',
-                    stageLabel: `Creating ${opts.splitPointsMs.length + 1} split files`,
+                    stageLabel: `Creating ${
+                      opts.postStitchLabel ?? 'split file'
+                    }${
+                      opts.splitPointsMs.length + 1 === 1 ? '' : 's'
+                    }`,
                     bytesWritten: tick.totalSize ?? 0,
                     outTimeMs: tick.outTimeMs ?? 0,
                     speed: tick.speed ?? '',
@@ -229,14 +242,42 @@ export function registerIpcHandlers(
               },
               ctrl.signal,
             );
-            splitOutputs = splitResult.outputs;
+            extraOutputs = splitResult.outputs;
+          } else if (
+            opts.postStitchMode === 'chapter-exports' &&
+            opts.chapterExports.length > 0
+          ) {
+            const exportResult = await runExtractRanges(
+              {
+                input: opts.output,
+                exports: opts.chapterExports,
+                onProgress: (progress) => {
+                  sendProgress({
+                    jobId,
+                    stage: 'split',
+                    stageLabel: `Creating ${
+                      opts.postStitchLabel ?? 'additional file'
+                    }${progress.totalCount === 1 ? '' : 's'} ${
+                      progress.currentIndex
+                    } of ${progress.totalCount}`,
+                    bytesWritten: progress.bytesWritten,
+                    outTimeMs: progress.outTimeMs,
+                    speed: progress.speed,
+                    fraction: 0.5 + progress.fraction * 0.5,
+                  });
+                },
+              },
+              ctrl.signal,
+            );
+            extraOutputs = exportResult.outputs;
           }
 
           sendDone({
             jobId,
             status: 'success',
             output: opts.output,
-            splitOutputs,
+            extraOutputs,
+            extraOutputLabel: opts.postStitchLabel,
             durationMs: Date.now() - startedAt,
           });
         } catch (err) {
@@ -247,7 +288,7 @@ export function registerIpcHandlers(
             sendDone({
               jobId,
               status: 'error',
-              error: String(typedError?.message ?? typedError),
+              error: formatJobError(typedError),
             });
           }
         } finally {

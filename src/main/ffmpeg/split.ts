@@ -3,6 +3,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import type { OutputFormat } from '../../shared/ipc-contract';
 import { resolveFfmpegPath } from './binaries';
+import { FfmpegProcessError } from './errors';
 import { makeProgressReader, type ProgressTick } from './progress';
 
 export interface SplitJob {
@@ -162,14 +163,26 @@ export async function runSplitSegments(
         return;
       }
       if (sigName) {
-        reject(new Error(`ffmpeg killed by signal ${sigName}`));
+        reject(
+          new FfmpegProcessError({
+            operation: 'split',
+            signalName: sigName,
+            stderr: stderrBuf,
+            input: job.input,
+            output: outputPattern,
+          }),
+        );
         return;
       }
       if (code !== 0) {
         reject(
-          new Error(
-            `ffmpeg split exited ${code}\n--- ffmpeg stderr (last 64k) ---\n${stderrBuf}`,
-          ),
+          new FfmpegProcessError({
+            operation: 'split',
+            exitCode: code,
+            stderr: stderrBuf,
+            input: job.input,
+            output: outputPattern,
+          }),
         );
         return;
       }

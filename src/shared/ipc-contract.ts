@@ -6,6 +6,7 @@ export interface FfmpegPaths {
 export type OutputFormat = 'mkv' | 'mp4';
 export type StitchModePreference = 'auto' | 'stream-copy' | 'reencode';
 export type JobStage = 'stitch' | 'split';
+export type PostStitchMode = 'none' | 'split-points' | 'chapter-exports';
 export type ResolvedStitchMode =
   | 'copy-mkv'
   | 'remux-mp4'
@@ -154,6 +155,13 @@ export interface StitchAnalysis {
   gaps: GapWarning[];
 }
 
+export interface PostStitchExport {
+  label: string;
+  output: string;
+  startMs: number;
+  endMs: number;
+}
+
 export interface PickOutputRequest {
   suggestedStem: string;
   currentOutputPath: string | null;
@@ -164,8 +172,14 @@ export interface StitchOptions {
   inputs: string[];
   /** Absolute output file path. Extension determines container. */
   output: string;
+  /** Optional post-stitch processing mode. */
+  postStitchMode: PostStitchMode;
   /** Optional post-stitch split points, in timeline milliseconds. */
   splitPointsMs: number[];
+  /** Optional per-file exports created after the main stitch. */
+  chapterExports: PostStitchExport[];
+  /** Friendly label for post-stitch progress and result summaries. */
+  postStitchLabel: string | null;
   /** Resolved execution mode after renderer-side analysis. */
   mode: ResolvedStitchMode;
   /** Sum of input file sizes in bytes. Used for fraction estimate
@@ -191,15 +205,23 @@ export interface JobProgress {
   fraction: number;
 }
 
+export interface JobErrorInfo {
+  title: string;
+  message: string;
+  suggestions: string[];
+  technicalDetails: string | null;
+}
+
 export type JobDone =
   | {
       jobId: string;
       status: 'success';
       output: string;
-      splitOutputs: string[];
+      extraOutputs: string[];
+      extraOutputLabel: string | null;
       durationMs: number;
     }
-  | { jobId: string; status: 'error'; error: string }
+  | { jobId: string; status: 'error'; error: JobErrorInfo }
   | { jobId: string; status: 'cancelled' };
 
 export interface Api {

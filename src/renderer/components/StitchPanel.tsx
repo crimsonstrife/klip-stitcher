@@ -14,6 +14,7 @@ import WaProgressBar from '@awesome.me/webawesome/dist/react/progress-bar/index.
 import type {
   JobDone,
   JobProgress,
+  PostStitchMode,
   StitchModePreference,
 } from '../../shared/ipc-contract';
 import type { StitchPlan } from '../../shared/stitch-analysis';
@@ -27,18 +28,26 @@ interface Props {
   selectedProbePending: boolean;
   stitchMode: StitchModePreference;
   stitchPlan: StitchPlan;
-  splitEnabled: boolean;
+  postStitchEnabled: boolean;
+  postStitchMode: PostStitchMode;
   splitTimestampsText: string;
-  splitPointCount: number;
-  splitErrors: string[];
-  splitWarnings: string[];
+  chapterMarkersText: string;
+  chapterPreRollSeconds: string;
+  chapterPostRollSeconds: string;
+  postStitchOutputCount: number;
+  postStitchErrors: string[];
+  postStitchWarnings: string[];
   running: boolean;
   progress: JobProgress | null;
   result: JobDone | null;
   onPickOutput: () => void;
   onSetStitchMode: (mode: StitchModePreference) => void;
-  onSetSplitEnabled: (enabled: boolean) => void;
+  onSetPostStitchEnabled: (enabled: boolean) => void;
+  onSetPostStitchMode: (mode: PostStitchMode) => void;
   onSetSplitTimestampsText: (value: string) => void;
+  onSetChapterMarkersText: (value: string) => void;
+  onSetChapterPreRollSeconds: (value: string) => void;
+  onSetChapterPostRollSeconds: (value: string) => void;
   onStitch: () => void;
   onCancel: () => void;
   onOpenOutput: (path: string) => void;
@@ -77,18 +86,26 @@ export function StitchPanel(props: Props) {
     selectedProbePending,
     stitchMode,
     stitchPlan,
-    splitEnabled,
+    postStitchEnabled,
+    postStitchMode,
     splitTimestampsText,
-    splitPointCount,
-    splitErrors,
-    splitWarnings,
+    chapterMarkersText,
+    chapterPreRollSeconds,
+    chapterPostRollSeconds,
+    postStitchOutputCount,
+    postStitchErrors,
+    postStitchWarnings,
     running,
     progress,
     result,
     onPickOutput,
     onSetStitchMode,
-    onSetSplitEnabled,
+    onSetPostStitchEnabled,
+    onSetPostStitchMode,
     onSetSplitTimestampsText,
+    onSetChapterMarkersText,
+    onSetChapterPreRollSeconds,
+    onSetChapterPostRollSeconds,
     onStitch,
     onCancel,
     onOpenOutput,
@@ -100,7 +117,7 @@ export function StitchPanel(props: Props) {
     clipCount === 0 ||
     selectedProbePending ||
     !stitchPlan.canStart ||
-    splitErrors.length > 0;
+    postStitchErrors.length > 0;
 
   return (
     <WaCard className="ks-card">
@@ -161,45 +178,130 @@ export function StitchPanel(props: Props) {
 
       <div className="ks-output-plan">
         <div className="ks-output-plan-header">
-          <strong>Post-stitch split</strong>
-          {splitEnabled && splitPointCount > 0 && (
+          <strong>Post-stitch exports</strong>
+          {postStitchEnabled && postStitchOutputCount > 0 && (
             <span className="ks-probing-note">
-              {splitPointCount} split point{splitPointCount === 1 ? '' : 's'} ·{' '}
-              {splitPointCount + 1} files
+              {postStitchOutputCount} file
+              {postStitchOutputCount === 1 ? '' : 's'} planned
             </span>
           )}
         </div>
         <label className="ks-mode-option">
           <input
             type="checkbox"
-            checked={splitEnabled}
+            checked={postStitchEnabled}
             disabled={running}
-            onChange={(event) => onSetSplitEnabled(event.currentTarget.checked)}
+            onChange={(event) =>
+              onSetPostStitchEnabled(event.currentTarget.checked)
+            }
           />
           <span className="ks-mode-option-body">
-            <strong>Create split files after stitching</strong>
+            <strong>Create extra files after stitching</strong>
             <span>
-              Enter VOD marker times to create numbered parts beside the stitched
-              output.
+              Either split the stitched file at exact marker times or import VOD
+              markers as padded chapter exports.
             </span>
           </span>
         </label>
-        {splitEnabled && (
+        {postStitchEnabled && (
           <div className="ks-split-editor">
-            <textarea
-              className="ks-split-textarea"
-              value={splitTimestampsText}
-              disabled={running}
-              placeholder={'00:15:32\n01:02:10\n1:45:00.500'}
-              onChange={(event) =>
-                onSetSplitTimestampsText(event.currentTarget.value)
-              }
-            />
-            <div className="ks-probing-note">
-              One timestamp per line, or separate with commas. Accepted formats:
-              <code>HH:MM:SS</code>, <code>MM:SS</code>, <code>SS</code>, with
-              optional decimals.
+            <div className="ks-mode-options">
+              <label className="ks-mode-option">
+                <input
+                  type="radio"
+                  name="post-stitch-mode"
+                  checked={postStitchMode === 'split-points'}
+                  disabled={running}
+                  onChange={() => onSetPostStitchMode('split-points')}
+                />
+                <span className="ks-mode-option-body">
+                  <strong>Split at timestamps</strong>
+                  <span>
+                    Create contiguous numbered parts using plain recording
+                    timestamps.
+                  </span>
+                </span>
+              </label>
+              <label className="ks-mode-option">
+                <input
+                  type="radio"
+                  name="post-stitch-mode"
+                  checked={postStitchMode === 'chapter-exports'}
+                  disabled={running}
+                  onChange={() => onSetPostStitchMode('chapter-exports')}
+                />
+                <span className="ks-mode-option-body">
+                  <strong>VOD chapter CSV</strong>
+                  <span>
+                    Align the first VOD marker to recording start, then export
+                    padded chapter files.
+                  </span>
+                </span>
+              </label>
             </div>
+            {postStitchMode === 'split-points' ? (
+              <>
+                <textarea
+                  className="ks-split-textarea"
+                  value={splitTimestampsText}
+                  disabled={running}
+                  placeholder={'00:15:32\n01:02:10\n1:45:00.500'}
+                  onChange={(event) =>
+                    onSetSplitTimestampsText(event.currentTarget.value)
+                  }
+                />
+                <div className="ks-probing-note">
+                  One timestamp per line, or separate with commas. Accepted
+                  formats: <code>HH:MM:SS</code>, <code>MM:SS</code>,{' '}
+                  <code>SS</code>, with optional decimals.
+                </div>
+              </>
+            ) : (
+              <>
+                <textarea
+                  className="ks-split-textarea"
+                  value={chapterMarkersText}
+                  disabled={running}
+                  placeholder={
+                    '0:25:12\tBroadcaster\tCrimsonStrife\n1:02:33\tBroadcaster\tCrimsonStrife'
+                  }
+                  onChange={(event) =>
+                    onSetChapterMarkersText(event.currentTarget.value)
+                  }
+                />
+                <div className="ks-padding-grid">
+                  <label className="ks-padding-field">
+                    <span>Pre-roll seconds</span>
+                    <input
+                      className="ks-padding-input"
+                      type="text"
+                      value={chapterPreRollSeconds}
+                      disabled={running}
+                      onChange={(event) =>
+                        onSetChapterPreRollSeconds(event.currentTarget.value)
+                      }
+                    />
+                  </label>
+                  <label className="ks-padding-field">
+                    <span>Post-roll seconds</span>
+                    <input
+                      className="ks-padding-input"
+                      type="text"
+                      value={chapterPostRollSeconds}
+                      disabled={running}
+                      onChange={(event) =>
+                        onSetChapterPostRollSeconds(event.currentTarget.value)
+                      }
+                    />
+                  </label>
+                </div>
+                <div className="ks-probing-note">
+                  Paste the exported VOD marker rows here. The first marker must
+                  represent recording start. If you do not have that marker, add
+                  a <code>0:00:00</code> row before pasting.
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -234,22 +336,28 @@ export function StitchPanel(props: Props) {
         </WaCallout>
       )}
 
-      {!running && !selectedProbePending && splitEnabled && splitErrors.length > 0 && (
+      {!running &&
+        !selectedProbePending &&
+        postStitchEnabled &&
+        postStitchErrors.length > 0 && (
         <WaCallout variant="danger" className="ks-result">
           <FontAwesomeIcon icon={faTriangleExclamation} slot="icon" />
           <div className="ks-plan-lines">
-            {splitErrors.map((message) => (
+            {postStitchErrors.map((message) => (
               <div key={message}>{message}</div>
             ))}
           </div>
         </WaCallout>
       )}
 
-      {!running && !selectedProbePending && splitEnabled && splitWarnings.length > 0 && (
+      {!running &&
+        !selectedProbePending &&
+        postStitchEnabled &&
+        postStitchWarnings.length > 0 && (
         <WaCallout variant="warning" className="ks-result">
           <FontAwesomeIcon icon={faTriangleExclamation} slot="icon" />
           <div className="ks-plan-lines">
-            {splitWarnings.map((message) => (
+            {postStitchWarnings.map((message) => (
               <div key={message}>{message}</div>
             ))}
           </div>
@@ -281,11 +389,12 @@ export function StitchPanel(props: Props) {
             <div>
               Done in {formatDuration(result.durationMs)} —{' '}
               <code>{result.output}</code>
-              {result.splitOutputs.length > 0 && (
+              {result.extraOutputs.length > 0 && (
                 <>
                   {' · '}
-                  {result.splitOutputs.length} split file
-                  {result.splitOutputs.length === 1 ? '' : 's'}
+                  {result.extraOutputs.length}{' '}
+                  {result.extraOutputLabel ?? 'additional file'}
+                  {result.extraOutputs.length === 1 ? '' : 's'}
                 </>
               )}
             </div>
@@ -303,7 +412,23 @@ export function StitchPanel(props: Props) {
       {!running && result?.status === 'error' && (
         <WaCallout variant="danger" className="ks-result">
           <FontAwesomeIcon icon={faTriangleExclamation} slot="icon" />
-          <pre className="ks-error">{result.error}</pre>
+          <div className="ks-error-panel">
+            <div className="ks-error-title">{result.error.title}</div>
+            <div>{result.error.message}</div>
+            {result.error.suggestions.length > 0 && (
+              <div className="ks-plan-lines ks-error-help">
+                {result.error.suggestions.map((suggestion) => (
+                  <div key={suggestion}>{suggestion}</div>
+                ))}
+              </div>
+            )}
+            {result.error.technicalDetails && (
+              <details className="ks-error-details">
+                <summary>Technical details</summary>
+                <pre className="ks-error">{result.error.technicalDetails}</pre>
+              </details>
+            )}
+          </div>
         </WaCallout>
       )}
       {!running && result?.status === 'cancelled' && (

@@ -498,6 +498,37 @@ body {
   gap: 0.55rem;
 }
 
+.ks-padding-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.ks-padding-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+}
+
+.ks-padding-field span {
+  color: var(--wa-color-text-quiet, #777);
+}
+
+.ks-padding-input {
+  border: 1px solid var(--wa-color-neutral-border-quiet, #ddd);
+  border-radius: 0.65rem;
+  padding: 0.6rem 0.7rem;
+  background: rgba(127, 127, 127, 0.04);
+  color: inherit;
+  font: inherit;
+}
+
+.ks-padding-input:focus-visible {
+  outline: 2px solid var(--wa-color-brand-fill-loud, #4a8cff);
+  outline-offset: 2px;
+}
+
 .ks-split-textarea {
   width: 100%;
   min-height: 8rem;
@@ -572,6 +603,32 @@ body {
   overflow-y: auto;
 }
 
+.ks-error-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.ks-error-title {
+  font-weight: 700;
+}
+
+.ks-error-help {
+  font-size: 0.9rem;
+}
+
+.ks-error-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.ks-error-details summary {
+  cursor: pointer;
+  font-size: 0.86rem;
+  color: var(--wa-color-text-quiet, #777);
+}
+
 /* Misc */
 code {
   background: rgba(127, 127, 127, 0.12);
@@ -606,5 +663,9 @@ code {
   .ks-output-plan-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .ks-padding-grid {
+    grid-template-columns: 1fr;
   }
 }

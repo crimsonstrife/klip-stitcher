@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import { app } from 'electron';
 import type { ResolvedStitchMode } from '../../shared/ipc-contract';
 import { resolveFfmpegPath } from './binaries';
+import { FfmpegProcessError } from './errors';
 import { makeProgressReader, type ProgressTick } from './progress';
 
 export interface ConcatJob {
@@ -186,14 +187,24 @@ export async function runConcat(
         return;
       }
       if (sigName) {
-        reject(new Error(`ffmpeg killed by signal ${sigName}`));
+        reject(
+          new FfmpegProcessError({
+            operation: 'stitch',
+            signalName: sigName,
+            stderr: stderrBuf,
+            output: job.output,
+          }),
+        );
         return;
       }
       if (code !== 0) {
         reject(
-          new Error(
-            `ffmpeg exited ${code}\n--- ffmpeg stderr (last 64k) ---\n${stderrBuf}`,
-          ),
+          new FfmpegProcessError({
+            operation: 'stitch',
+            exitCode: code,
+            stderr: stderrBuf,
+            output: job.output,
+          }),
         );
         return;
       }
