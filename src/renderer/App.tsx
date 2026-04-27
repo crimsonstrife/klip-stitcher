@@ -138,6 +138,7 @@ export function App() {
   const [selectedClipPaths, setSelectedClipPaths] = useState<Set<string>>(
     () => new Set(),
   );
+  const [hasScannedCurrentFolder, setHasScannedCurrentFolder] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [output, setOutput] = useState<string | null>(null);
@@ -162,6 +163,23 @@ export function App() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    void window.api.getPreferences().then((prefs) => {
+      if (cancelled) {
+        return;
+      }
+      setFolder(prefs.lastFolder);
+      setOutput(prefs.lastOutputPath);
+      setHasScannedCurrentFolder(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const totalBytes = clips.reduce((sum, c) => sum + c.size, 0);
   const selectedClips = clips.filter((clip) => selectedClipPaths.has(clip.path));
   const selectedBytes = selectedClips.reduce((sum, clip) => sum + clip.size, 0);
@@ -179,20 +197,19 @@ export function App() {
     (clip) => clip.probeStatus === 'error',
   ).length;
 
-  const handlePickFolder = async () => {
-    const f = await window.api.pickFolder();
-    if (!f) return;
+  const scanFolderPath = async (folderPath: string) => {
     const scanToken = scanTokenRef.current + 1;
     scanTokenRef.current = scanToken;
 
-    setFolder(f);
+    setFolder(folderPath);
     setScanResult({ clips: [], sessions: [] });
     setSelectedClipPaths(new Set());
+    setHasScannedCurrentFolder(false);
     setScanError(null);
     setScanning(true);
     setResult(null);
     try {
-      const nextScanResult = await window.api.scanFolder(f);
+      const nextScanResult = await window.api.scanFolder(folderPath);
       if (scanTokenRef.current !== scanToken) {
         return;
       }
@@ -201,6 +218,7 @@ export function App() {
       setSelectedClipPaths(
         new Set(nextScanResult.sessions[0]?.clipPaths ?? []),
       );
+      setHasScannedCurrentFolder(true);
 
       if (nextScanResult.clips.length > 0) {
         void window.api
@@ -249,6 +267,7 @@ export function App() {
     } catch (e) {
       if (scanTokenRef.current === scanToken) {
         setScanError(String(e));
+        setHasScannedCurrentFolder(false);
       }
     } finally {
       if (scanTokenRef.current === scanToken) {
@@ -257,10 +276,25 @@ export function App() {
     }
   };
 
+  const handlePickFolder = async () => {
+    const f = await window.api.pickFolder();
+    if (!f) return;
+    await scanFolderPath(f);
+  };
+
+  const handleScanSavedFolder = async () => {
+    if (!folder) return;
+    await scanFolderPath(folder);
+  };
+
   const handlePickOutput = async () => {
     const leadClip = selectedClips[0] ?? clips[0];
-    const first = leadClip?.name.replace(/\.[^.]+$/u, '') ?? 'stitched';
-    const o = await window.api.pickOutputFile(`${first}-stitched.mkv`);
+    const suggestedStem =
+      `${leadClip?.name.replace(/\.[^.]+$/u, '') ?? 'stitched'}-stitched`;
+    const o = await window.api.pickOutputFile({
+      suggestedStem,
+      currentOutputPath: output,
+    });
     if (o) setOutput(o);
   };
 
@@ -323,9 +357,11 @@ export function App() {
         clipCount={clips.length}
         totalBytes={totalBytes}
         totalDurationMs={totalDurationMs}
+        hasScannedCurrentFolder={hasScannedCurrentFolder}
         scanning={scanning}
         probingMetadata={probingMetadata}
         metadataErrorCount={metadataErrorCount}
+        onScanFolder={handleScanSavedFolder}
         onPickFolder={handlePickFolder}
       />
 

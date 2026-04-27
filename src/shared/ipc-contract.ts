@@ -3,6 +3,14 @@ export interface FfmpegPaths {
   ffprobe: string;
 }
 
+export type OutputFormat = 'mkv' | 'mp4';
+
+export interface AppPreferences {
+  lastFolder: string | null;
+  lastOutputPath: string | null;
+  preferredOutputFormat: OutputFormat;
+}
+
 export interface ClipMetadata {
   /** Container duration in milliseconds, if ffprobe reports one. */
   durationMs: number | null;
@@ -96,6 +104,11 @@ export interface ClipThumbnailResult {
   error: string | null;
 }
 
+export interface PickOutputRequest {
+  suggestedStem: string;
+  currentOutputPath: string | null;
+}
+
 export interface StitchOptions {
   /** Ordered list of input file paths to concatenate. */
   inputs: string[];
@@ -131,9 +144,10 @@ export type JobDone =
 export interface Api {
   // M0
   getFfmpegPaths(): Promise<FfmpegPaths>;
+  getPreferences(): Promise<AppPreferences>;
   // M1
   pickFolder(): Promise<string | null>;
-  pickOutputFile(defaultName: string): Promise<string | null>;
+  pickOutputFile(request: PickOutputRequest): Promise<string | null>;
   scanFolder(folder: string): Promise<ClipScanResult>;
   probeClips(paths: string[]): Promise<ClipProbeResult[]>;
   generateThumbnails(

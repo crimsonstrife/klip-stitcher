@@ -10,9 +10,11 @@ interface Props {
   clipCount: number;
   totalBytes: number;
   totalDurationMs: number | null;
+  hasScannedCurrentFolder: boolean;
   scanning: boolean;
   probingMetadata: boolean;
   metadataErrorCount: number;
+  onScanFolder: () => void;
   onPickFolder: () => void;
 }
 
@@ -21,11 +23,15 @@ export function DropZone({
   clipCount,
   totalBytes,
   totalDurationMs,
+  hasScannedCurrentFolder,
   scanning,
   probingMetadata,
   metadataErrorCount,
+  onScanFolder,
   onPickFolder,
 }: Props) {
+  const needsScan = Boolean(folder) && !hasScannedCurrentFolder;
+
   return (
     <WaCard className="ks-card">
       <div slot="header">
@@ -41,6 +47,8 @@ export function DropZone({
               <span className="ks-scanning">
                 <WaSpinner /> Scanning…
               </span>
+            ) : needsScan ? (
+              <span>Saved folder ready to scan.</span>
             ) : (
               <span>
                 {clipCount.toLocaleString()} clip{clipCount === 1 ? '' : 's'}
@@ -82,15 +90,28 @@ export function DropZone({
       )}
 
       <div slot="footer">
-        <WaButton
-          variant="brand"
-          appearance="accent"
-          onClick={onPickFolder}
-          disabled={scanning}
-        >
-          <FontAwesomeIcon icon={faFolderOpen} slot="start" />
-          {folder ? 'Choose different folder' : 'Choose folder'}
-        </WaButton>
+        <div className="ks-source-actions">
+          {needsScan && (
+            <WaButton
+              variant="brand"
+              appearance="accent"
+              onClick={onScanFolder}
+              disabled={scanning}
+            >
+              <FontAwesomeIcon icon={faFolderOpen} slot="start" />
+              Scan saved folder
+            </WaButton>
+          )}
+          <WaButton
+            variant={needsScan ? 'neutral' : 'brand'}
+            appearance={needsScan ? 'outlined' : 'accent'}
+            onClick={onPickFolder}
+            disabled={scanning}
+          >
+            <FontAwesomeIcon icon={faFolderOpen} slot="start" />
+            {folder ? 'Choose different folder' : 'Choose folder'}
+          </WaButton>
+        </div>
       </div>
     </WaCard>
   );

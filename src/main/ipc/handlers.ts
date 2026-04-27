@@ -4,9 +4,11 @@ import {
   dialog,
   shell,
 } from 'electron';
+import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { CH } from '../../shared/ipc-channels';
 import type {
+  AppPreferences,
   ClipProbeResult,
   ClipScanResult,
   ClipThumbnailRequest,
@@ -14,6 +16,7 @@ import type {
   FfmpegPaths,
   JobDone,
   JobProgress,
+  PickOutputRequest,
   StitchOptions,
 } from '../../shared/ipc-contract';
 import { resolveFfmpegPath, resolveFfprobePath } from '../ffmpeg/binaries';
@@ -21,6 +24,35 @@ import { probeClips } from '../ffmpeg/probe';
 import { generateThumbnails } from '../ffmpeg/thumbnail';
 import { scanFolder } from '../services/clipScanner';
 import { runConcat } from '../ffmpeg/concat';
+import {
+  getPreferences,
+  rememberLastFolder,
+  rememberLastOutputPath,
+} from '../services/preferences';
+
+function buildOutputFilters(preferredFormat: AppPreferences['preferredOutputFormat']) {
+  const mkv = { name: 'Matroska video', extensions: ['mkv'] };
+  const mp4 = { name: 'MPEG-4 video', extensions: ['mp4'] };
+  return preferredFormat === 'mp4' ? [mp4, mkv] : [mkv, mp4];
+}
+
+function buildDefaultOutputPath(
+  request: PickOutputRequest,
+  prefs: AppPreferences,
+): string {
+  if (request.currentOutputPath) {
+    return request.currentOutputPath;
+  }
+
+  const filename = `${request.suggestedStem}.${prefs.preferredOutputFormat}`;
+  if (prefs.lastOutputPath) {
+    return path.join(path.dirname(prefs.lastOutputPath), filename);
+  }
+  if (prefs.lastFolder) {
+    return path.join(prefs.lastFolder, filename);
+  }
+  return filename;
+}
 
 export function registerIpcHandlers(
   ipcMain: IpcMain,
@@ -31,6 +63,10 @@ export function registerIpcHandlers(
     ffmpeg: resolveFfmpegPath(),
     ffprobe: resolveFfprobePath(),
   }));
+  ipcMain.handle(
+    CH.APP_PREFERENCES_GET,
+    async (): Promise<AppPreferences> => getPreferences(),
+  );
 
   // --- M1 dialogs ---------------------------------------------------
   ipcMain.handle(
@@ -38,28 +74,36 @@ export function registerIpcHandlers(
     async (): Promise<string | null> => {
       const win = getMainWindow();
       if (!win) return null;
+      const prefs = getPreferences();
       const result = await dialog.showOpenDialog(win, {
         title: 'Select clip folder',
         properties: ['openDirectory'],
+        defaultPath: prefs.lastFolder ?? undefined,
       });
-      return result.canceled ? null : (result.filePaths[0] ?? null);
+      const folderPath = result.canceled ? null : (result.filePaths[0] ?? null);
+      if (folderPath) {
+        rememberLastFolder(folderPath);
+      }
+      return folderPath;
     },
   );
 
   ipcMain.handle(
     CH.DIALOG_PICK_OUTPUT,
-    async (_event, defaultName: string): Promise<string | null> => {
+    async (_event, request: PickOutputRequest): Promise<string | null> => {
       const win = getMainWindow();
       if (!win) return null;
+      const prefs = getPreferences();
       const result = await dialog.showSaveDialog(win, {
         title: 'Save stitched output',
-        defaultPath: defaultName,
-        filters: [
-          { name: 'Matroska video', extensions: ['mkv'] },
-          { name: 'MPEG-4 video', extensions: ['mp4'] },
-        ],
+        defaultPath: buildDefaultOutputPath(request, prefs),
+        filters: buildOutputFilters(prefs.preferredOutputFormat),
       });
-      return result.canceled ? null : (result.filePath ?? null);
+      const outputPath = result.canceled ? null : (result.filePath ?? null);
+      if (outputPath) {
+        rememberLastOutputPath(outputPath);
+      }
+      return outputPath;
     },
   );
 

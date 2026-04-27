@@ -5,11 +5,12 @@ import type { Api, JobDone, JobProgress } from '../shared/ipc-contract';
 const api: Api = {
   // M0
   getFfmpegPaths: () => ipcRenderer.invoke(CH.FFMPEG_PATHS),
+  getPreferences: () => ipcRenderer.invoke(CH.APP_PREFERENCES_GET),
 
   // M1
   pickFolder: () => ipcRenderer.invoke(CH.DIALOG_PICK_FOLDER),
-  pickOutputFile: (defaultName) =>
-    ipcRenderer.invoke(CH.DIALOG_PICK_OUTPUT, defaultName),
+  pickOutputFile: (request) =>
+    ipcRenderer.invoke(CH.DIALOG_PICK_OUTPUT, request),
   scanFolder: (folder) => ipcRenderer.invoke(CH.CLIPS_SCAN, folder),
   probeClips: (paths) => ipcRenderer.invoke(CH.CLIPS_PROBE, paths),
   generateThumbnails: (requests) =>

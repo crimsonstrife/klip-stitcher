@@ -1,6 +1,7 @@
 export const CH = {
   // M0
   FFMPEG_PATHS: 'app:ffmpeg-paths',
+  APP_PREFERENCES_GET: 'app:preferences:get',
 
   // M1 — dialogs
   DIALOG_PICK_FOLDER: 'dialog:pick-folder',

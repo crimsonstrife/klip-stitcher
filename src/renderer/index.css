@@ -99,6 +99,12 @@ body {
   padding-block: 1.5rem;
 }
 
+.ks-source-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .ks-scanning {
   display: inline-flex;
   align-items: center;
